@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # 1. The Message Broker (RabbitMQ)
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: casebridge_rabbitmq
+    ports:
+      - "5672:5672"   
+      - "15672:15672" 
+    volumes:
+      - rabbitmqvolume:/var/lib/rabbitmq
+
+  # 2. The Document Vault (MinIO)
+  minio:
+    image: minio/minio
+    container_name: casebridge_minio
+    ports:
+      - "9000:9000"   
+      - "9001:9001"   
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=SuperSecretPassw0rd!
+    command: server /data --console-address ":9001"
+    volumes:
+      - miniovolume:/data
+
+# Persistent Storage Definitions
+volumes:
+  rabbitmqvolume:
+  miniovolume:

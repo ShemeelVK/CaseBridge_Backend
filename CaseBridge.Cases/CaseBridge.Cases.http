@@ -1,0 +1,6 @@
+@CaseBridge.Cases_HostAddress = http://localhost:5035
+
+GET {{CaseBridge.Cases_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
