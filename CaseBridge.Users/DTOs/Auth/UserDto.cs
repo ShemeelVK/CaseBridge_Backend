@@ -1,12 +1,18 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace CaseBridge_Users.Dtos
+namespace CaseBridge_Users.DTOs.Auth
 {
     public class RegisterClientDto
     {
         public string Email { get; set; } = string.Empty;
         public string Password { get; set; } = string.Empty;
         public string FullName { get; set; } = string.Empty;
+
+        public string? PhoneNumber { get; set; }
+        public string? Address { get; set; }
+
+        // Defaulting to "Individual" keeps it simple for now
+        public string ClientType { get; set; } = "Individual";
     }
 
     // Extension: Specific to Lawyers

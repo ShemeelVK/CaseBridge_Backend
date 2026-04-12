@@ -8,5 +8,6 @@
         public string EnrollmentNumber { get; set; } = string.Empty;
         public string Specialization { get; set; } = string.Empty;
         public string FirmBio {  get; set; } = string.Empty;
+        public bool IsVerified { get; set; }
     }
 }

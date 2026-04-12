@@ -1,4 +1,4 @@
-﻿using CaseBridge_Users.Dtos;
+﻿using CaseBridge_Users.DTOs.Auth;
 using CaseBridge_Users.Models;
 using CaseBridge_Users.Repositories;
 using CaseBridge_Users.Services;
@@ -35,6 +35,7 @@ namespace CaseBridge_Users.Controllers
         [HttpPost("register/client")]
         public async Task<IActionResult> RegisterClient([FromBody] RegisterClientDto dto)
         {
+            // 1. Map to the common User object
             var user = new User
             {
                 Email = dto.Email,
@@ -42,12 +43,22 @@ namespace CaseBridge_Users.Controllers
                 UserType = "Client"
             };
 
-            var verificationToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            // 2. Map to the specific ClientProfile object
+            var profile = new ClientProfile
+            {
+                PhoneNumber = dto.PhoneNumber,
+                Address = dto.Address,
+                ClientType = dto.ClientType
+            };
 
-            var success = await _userRepository.RegisterClientAsync(user, dto.Password, verificationToken);
-            if (!success) return BadRequest("Registration failed.");
+            var verificationToken = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32));
 
-            return Ok(new { Message = "Client registered successfully. Please check your email to verify your account." });
+            // 3. Pass both to the Repository
+            var success = await _userRepository.RegisterClientAsync(user, profile, dto.Password, verificationToken);
+
+            if (!success) return BadRequest("Email might already be in use.");
+
+            return Ok(new { Message = "Client account created. Please check your email for verification." });
         }
 
         [HttpPost("register/lawyer")]
@@ -104,10 +115,10 @@ namespace CaseBridge_Users.Controllers
             if (security.LockoutEnd.HasValue && security.LockoutEnd > DateTime.Now)
                 return StatusCode(403, $"Account locked. Try again after {security.LockoutEnd}");
 
-            if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+            if (!BCrypt.Net.BCrypt.Verify(dto.Password, security.PasswordHash))
             {
-                security.AccessFailedCount++;
-                if (security.AccessFailedCount >= 5) 
+                security.FailedLoginAttempts++;
+                if (security.FailedLoginAttempts >= 5) 
                     security.LockoutEnd = DateTime.Now.AddMinutes(10);
                 
                 await _userRepository.UpdateSecurityStatusAsync(security);
@@ -124,7 +135,7 @@ namespace CaseBridge_Users.Controllers
             var accessToken = _tokenService.CreateToken(user, profile);
             var refreshToken = _tokenService.GenerateRefreshToken();
 
-            security.AccessFailedCount = 0;
+            security.FailedLoginAttempts= 0;
             await _userRepository.UpdateRefreshTokenAsync(user.Id, refreshToken, DateTime.Now.AddDays(7));
             await _userRepository.UpdateSecurityStatusAsync(security);
 
@@ -198,8 +209,13 @@ namespace CaseBridge_Users.Controllers
                     }
                     else
                     {
-                        // Register using the 2-table transaction
-                        await _userRepository.RegisterClientAsync(user, string.Empty, string.Empty);
+                        var newClientProfile = new ClientProfile
+                        {
+                            ClientType = "Individual"
+                        };
+
+                        // FIX: Register using the 3-table transaction (Client) - Passing all 4 arguments
+                        await _userRepository.RegisterClientAsync(user, newClientProfile, string.Empty, string.Empty);
                     }
 
                     (_, security) = await _userRepository.GetUserWithSecurityAsync(payload.Email);
@@ -215,7 +231,7 @@ namespace CaseBridge_Users.Controllers
                         await _userRepository.UpdateSecurityStatusAsync(security);
                     }
 
-                // 4. Finalizing the session
+                // Finalizing the session
 
                 var (_, lawyerProfile) = await _userRepository.GetUserAndProfileAsync(user.Id);
 
@@ -284,7 +300,7 @@ namespace CaseBridge_Users.Controllers
            
             security.PasswordResetToken = null;
             security.ResetTokenExpiry = null;
-            security.AccessFailedCount = 0;
+            security.FailedLoginAttempts = 0;
             security.LockoutEnd = null;
 
             await _userRepository.UpdateSecurityStatusAsync(security);
@@ -297,11 +313,11 @@ namespace CaseBridge_Users.Controllers
         {
             var (user, security) = await _userRepository.GetUserWithSecurityAsync(email);
 
-            if (security == null || security.EmailVerificationToken != token)
+            if (security == null || security.VerificationToken != token)
                 return BadRequest("Invalid or expired verification link.");
 
             security.IsEmailVerified = true;
-            security.EmailVerificationToken = null;
+            security.VerificationToken = null;
             
             await _userRepository.UpdateSecurityStatusAsync(security);
             return Ok("Email verified! You can now log in.");

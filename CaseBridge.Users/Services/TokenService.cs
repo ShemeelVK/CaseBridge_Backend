@@ -14,7 +14,7 @@ namespace CaseBridge_Users.Services
         public TokenService(IConfiguration config)
         {
             _config = config;
-            _key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jtw:Key"]!));
+            _key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         }
 
         public string CreateToken(User user, LawyerProfile? profile = null)

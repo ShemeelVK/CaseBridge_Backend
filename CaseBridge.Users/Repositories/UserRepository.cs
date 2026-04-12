@@ -2,6 +2,7 @@
 using CaseBridge_Users.Data;
 using CaseBridge_Users.Models;
 using Dapper;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Identity.Client;
 using System.Data;
 using System.Security;
@@ -20,7 +21,7 @@ namespace CaseBridge_Users.Repositories
 
         public async Task<bool> RegisterLawyerAsync(User user, LawyerProfile profile, string password, string verificationToken)
         {
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+            var PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
 
             using var connection = _context.CreateConnection();
             connection.Open();
@@ -28,22 +29,23 @@ namespace CaseBridge_Users.Repositories
 
             try
             {
-                var userSql = @"INSERT INTO Users (Email, PasswordHash, FullName, UserType) 
-                              VALUES (@Email, @PasswordHash, @FullName, @UserType);
+                var userSql = @"INSERT INTO Users (Email, FullName, UserType) 
+                              VALUES (@Email, @FullName, @UserType);
                               SELECT CAST(SCOPE_IDENTITY() as int);";
-                user.Id=await connection.ExecuteScalarAsync<int>(userSql, user, transaction);
+                user.Id = await connection.ExecuteScalarAsync<int>(userSql, user, transaction);
 
-                var securitySql = @"INSERT INTO UserSecurity (UserId, IsEmailVerified, EmailVerificationToken, AccessFailedCount) 
-                            VALUES (@UserId, 0, @MyToken, 0)";
+                var securitySql = @"INSERT INTO UserSecurity (UserId, PasswordHash, IsEmailVerified, VerificationToken, FailedLoginAttempts) 
+                                    VALUES (@UserId, @Hash, 0, @Token, 0)";
 
                 await connection.ExecuteAsync(securitySql, new
                 {
                     UserId = user.Id,
-                    MyToken = verificationToken
+                    Hash = PasswordHash,
+                    Token = verificationToken
                 }, transaction);
 
-                var profileSql = @"INSERT INTO LawyerProfiles (UserId, EnrollmentNumber, Specialization, SeniorLawyerId, FirmBio) 
-                           VALUES (@UserId, @EnrollmentNumber, @Specialization, @SeniorLawyerId, @FirmBio)";
+                var profileSql = @"INSERT INTO LawyerProfiles (UserId, EnrollmentNumber, Specialization, SeniorLawyerId, FirmBio, IsVerified) 
+                                   VALUES (@UserId, @EnrollmentNumber, @Specialization, @SeniorLawyerId, @FirmBio, 0)";
 
                 profile.UserId = user.Id;
                 await connection.ExecuteAsync(profileSql, profile, transaction);
@@ -58,9 +60,9 @@ namespace CaseBridge_Users.Repositories
                 throw;
             }
         }
-        public async Task<bool> RegisterClientAsync(User user, string password, string verificationToken)
+        public async Task<bool> RegisterClientAsync(User user, ClientProfile profile, string password, string verificationToken)
         {
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
 
             using var connection = _context.CreateConnection();
             connection.Open();
@@ -68,16 +70,22 @@ namespace CaseBridge_Users.Repositories
 
             try
             {
-                var userSql = @"INSERT INTO Users (Email, PasswordHash, FullName, UserType) 
-                                VALUES (@Email, @PasswordHash, @FullName, @UserType);
-                                SELECT CAST(SCOPE_IDENTITY() as int);";
-
+                // Insert into Users
+                var userSql = @"INSERT INTO Users (Email, FullName, UserType) 
+                        VALUES (@Email, @FullName, 'Client');
+                        SELECT CAST(SCOPE_IDENTITY() as int);";
                 user.Id = await connection.ExecuteScalarAsync<int>(userSql, user, transaction);
 
-                var securitySql = @"INSERT INTO UserSecurity (UserId, IsEmailVerified, EmailVerificationToken, AccessFailedCount) 
-                                    VALUES (@Id, 0, @Token, 0)";
+                // Insert into UserSecurity
+                var securitySql = @"INSERT INTO UserSecurity (UserId, PasswordHash, IsEmailVerified, VerificationToken, FailedLoginAttempts) 
+                            VALUES (@UserId, @Hash, 0, @Token, 0)";
+                await connection.ExecuteAsync(securitySql, new { UserId = user.Id, Hash = passwordHash, Token = verificationToken }, transaction);
 
-                await connection.ExecuteAsync(securitySql, new { Id = user.Id, Token = verificationToken }, transaction);
+                // Insert into ClientProfiles
+                var profileSql = @"INSERT INTO ClientProfiles (UserId, PhoneNumber, Address, ClientType) 
+                           VALUES (@UserId, @PhoneNumber, @Address, @ClientType)";
+                profile.UserId = user.Id;
+                await connection.ExecuteAsync(profileSql, profile, transaction);
 
                 transaction.Commit();
                 return true;
@@ -108,7 +116,7 @@ namespace CaseBridge_Users.Repositories
             return result.FirstOrDefault();
         }
 
-       // Fetch User and Profile together(needed for Senior verification)
+        // Fetch User and Profile together(needed for Senior verification)
         public async Task<(User?, LawyerProfile?)> GetUserAndProfileAsync(int userId)
         {
             using var connection = _context.CreateConnection();
@@ -159,12 +167,15 @@ namespace CaseBridge_Users.Repositories
         {
             using var connection = _context.CreateConnection();
             var sql = @"UPDATE UserSecurity 
-                        SET IsEmailVerified = @IsEmailVerified, 
-                            PasswordResetToken = @PasswordResetToken, 
-                            ResetTokenExpiry = @ResetTokenExpiry,
-                            AccessFailedCount = @AccessFailedCount,
-                            LockoutEnd = @LockoutEnd
-                        WHERE UserId = @UserId";
+                SET IsEmailVerified = @IsEmailVerified, 
+                    VerificationToken = @VerificationToken,
+                    PasswordHash = @PasswordHash,
+                    PasswordResetToken = @PasswordResetToken, 
+                    ResetTokenExpiry = @ResetTokenExpiry,
+                    FailedLoginAttempts = @FailedLoginAttempts, 
+                    LockoutEnd = @LockoutEnd,
+                    IsLocked = @IsLocked
+                WHERE UserId = @UserId";
             await connection.ExecuteAsync(sql, security);
         }
 
@@ -173,10 +184,80 @@ namespace CaseBridge_Users.Repositories
             using var connection = _context.CreateConnection();
             var sql = @"UPDATE Users 
                 SET FullName = @FullName, 
-                    GoogleId = @GoogleId,
-                    PasswordHash = @PasswordHash -- ADD THIS LINE
+                    GoogleId = @GoogleId
                 WHERE Id = @Id";
             await connection.ExecuteAsync(sql, user);
         }
+
+        //List lawyers needing verification
+        public async Task<IEnumerable<dynamic>> GetUnverifiedLawyersAsync()
+        {
+            using var connection = _context.CreateConnection();
+            var sql = @"SELECT u.Id, u.FullName, u.Email, p.EnrollmentNumber 
+                FROM Users u
+                JOIN LawyerProfiles p ON u.Id = p.UserId
+                WHERE p.IsVerified = 0"; // Assuming you added IsVerified column
+
+            return await connection.QueryAsync(sql);
+        }
+
+        public async Task<bool> UpdateLawyerVerificationAsync(int userId, bool status)
+        {
+            using var connection = _context.CreateConnection();
+            var sql = @"UPDATE LawyerProfiles SET IsVerified = @Status WHERE UserId = @UserId";
+            var rows = await connection.ExecuteAsync(sql, new { UserId = userId, Status = status });
+            return rows > 0;
+        }
+
+
+        // --- SENIOR FIRM MANAGEMENT METHODS ---
+
+        // Fetch all juniors linked to a specific Senior ID
+        public async Task<IEnumerable<dynamic>> GetFirmAssociatesAsync(int seniorId)
+        {
+            using var connection = _context.CreateConnection();
+
+            // We join Users and Profiles to get a clean summary of the Junior
+            var sql = @"SELECT 
+                            u.Id, 
+                            u.Email, 
+                            u.FullName, 
+                            p.EnrollmentNumber, 
+                            p.Specialization 
+                        FROM Users u 
+                        JOIN LawyerProfiles p ON u.Id = p.UserId 
+                        WHERE p.SeniorLawyerId = @SeniorId";
+
+            return await connection.QueryAsync(sql, new { SeniorId = seniorId });
+        }
+
+        // Update the Firm's Bio
+        public async Task UpdateFirmBioAsync(int userId, string firmBio)
+        {
+            using var connection = _context.CreateConnection();
+            var sql = @"UPDATE LawyerProfiles 
+                        SET FirmBio = @FirmBio 
+                        WHERE UserId = @UserId";
+
+            await connection.ExecuteAsync(sql, new { UserId = userId, FirmBio = firmBio });
+        }
+
+
+
+        // --- Junior FIRM MANAGEMENT METHODS ---
+
+        public async Task<dynamic?> GetSeniorForJuniorAsync(int juniorId)
+        {
+            using var connection = _context.CreateConnection();
+            var sql = @"SELECT senior.FullName, senior.Email, p_senior.Specialization, p_senior.FirmBio
+                FROM Users junior
+                JOIN LawyerProfiles p_junior ON junior.Id = p_junior.UserId
+                JOIN Users senior ON p_junior.SeniorLawyerId = senior.Id
+                JOIN LawyerProfiles p_senior ON senior.Id = p_senior.UserId
+                WHERE junior.Id = @JuniorId";
+
+            return await connection.QueryFirstOrDefaultAsync(sql, new { JuniorId = juniorId });
+        }
+
     }
 }

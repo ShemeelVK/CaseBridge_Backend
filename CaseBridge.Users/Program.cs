@@ -2,6 +2,7 @@
 using CaseBridge_Users.Services;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.OpenApi.Models;
 
 namespace CaseBridge.Users
 {
@@ -37,6 +38,44 @@ namespace CaseBridge.Users
                         ValidAudience = builder.Configuration["Jwt:Audience"]
                     };
                 });
+
+            builder.Services.AddSwaggerGen(options =>
+            {
+                // 1. Set the Swagger UI header info
+                options.SwaggerDoc("v1", new OpenApiInfo
+                {
+                    Title = "CaseBridge_Users API",
+                    Version = "v1",
+                    Description = "Authentication, Registration, and Firm Hierarchy Management"
+                });
+
+                // 2. Define the "Authorize" button and its behavior
+                options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+                {
+                    Name = "Authorization",
+                    Type = SecuritySchemeType.Http,
+                    Scheme = "Bearer",
+                    BearerFormat = "JWT",
+                    In = ParameterLocation.Header,
+                    Description = "Paste your JWT Access Token below (Do NOT include 'Bearer ' prefix, just the token)."
+                });
+
+                // 3. Ensure the token is sent in the header of every request
+                options.AddSecurityRequirement(new OpenApiSecurityRequirement
+                 {
+              {
+                    new OpenApiSecurityScheme
+                    {
+                        Reference = new OpenApiReference
+                        {
+                            Type = ReferenceType.SecurityScheme,
+                            Id = "Bearer"
+                        }
+                    },
+                    Array.Empty<string>()
+                }
+              });
+                    });
 
             var app = builder.Build();
             
