@@ -77,7 +77,7 @@ namespace CaseBridge_Users.Controllers
             {
                 EnrollmentNumber = dto.EnrollmentNumber,
                 Specialization = dto.Specialization,
-                SeniorLawyerId=dto.SeniorLawyerId,
+                SeniorLawyerId=null,
                 FirmBio=dto.FirmBio,
             };
 

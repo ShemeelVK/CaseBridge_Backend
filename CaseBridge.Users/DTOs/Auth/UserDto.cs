@@ -16,17 +16,23 @@ namespace CaseBridge_Users.DTOs.Auth
     }
 
     // Extension: Specific to Lawyers
-    public class RegisterLawyerDto : RegisterClientDto
+    public class RegisterLawyerDto
     {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        public string FullName { get; set; } = string.Empty;
+
         [Required]
         public string EnrollmentNumber { get; set; } = string.Empty;
 
         public string Specialization { get; set; } = string.Empty;
 
-        // For Junior Lawyers: Link them to their boss
-        public int? SeniorLawyerId { get; set; }
-
-        // For Senior Lawyers / Firms: Their professional profile
         public string? FirmBio { get; set; }
     }
     public class UserDTO
