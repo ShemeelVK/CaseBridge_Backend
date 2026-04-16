@@ -23,6 +23,7 @@ namespace CaseBridge_Users.Services
             {
                 // nameid is now an INT string
                 new Claim(JwtRegisteredClaimNames.NameId, user.Id.ToString()),
+                new Claim("UserId", user.Id.ToString()),
                 new Claim(JwtRegisteredClaimNames.Email, user.Email),
                 new Claim(JwtRegisteredClaimNames.Name, user.FullName),
                 
