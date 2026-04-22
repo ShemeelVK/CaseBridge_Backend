@@ -9,7 +9,10 @@
         public string Category { get; set; }
         public CaseStatus Status { get; set; } = CaseStatus.Open;
         public int? AssignedFirmId { get; set; }
-        public int? AcceptedByuserid{ get; set; }
+        public int? AcceptedByUserId{ get; set; }
         public DateTime? CreatedAt { get; set; }
+        public int LastModifiedByUserId { get; set; }
+
+        public ICollection<CaseHistory> Histories { get; set; } = new List<CaseHistory>();
     }
 }

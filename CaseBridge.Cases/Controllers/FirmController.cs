@@ -1,5 +1,6 @@
 ﻿using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Features.Lawyer.Commands.CloseCase;
+using CaseBridge_Cases.Features.Lawyer.Commands.DropCase;
 using CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCases;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
@@ -52,7 +53,8 @@ namespace CaseBridge_Cases.Controllers
             var command = new CloseCaseCommand
             {
                 CaseId = id,
-                FirmId = int.Parse(seniorIdClaim)
+                FirmId = int.Parse(seniorIdClaim),
+                UserId=int.Parse(seniorIdClaim)
             };
 
             try
@@ -72,6 +74,39 @@ namespace CaseBridge_Cases.Controllers
                 return BadRequest(new { Error = ex.Message });
             }
             
+        }
+
+        [HttpPut("cases/{id}/drop-case")]
+        public async Task<IActionResult> DropCase(int id)
+        {
+            var seniorIdClaim = User.FindFirst("SeniorId")?.Value;
+
+            if (string.IsNullOrEmpty(seniorIdClaim))
+            {
+                return Unauthorized(new { Message = "Senior ID is missing from your security token." });
+            }
+
+            var command = new DropCaseCommand
+            {
+                CaseId = id,
+                FirmId = int.Parse(seniorIdClaim),
+                UserId = int.Parse(seniorIdClaim)
+            };
+
+            try
+            {
+                var result = await _mediator.Send(command);
+                return Ok(new { Message = "Case successfully dropped and returned to the marketplace!", Success = result });
+            }
+            catch(UnauthorizedAccessException ex)
+            {
+               return StatusCode(403, new { Error = ex.Message });
+            }
+            catch(Exception ex)
+            {
+                return BadRequest(new { Error = ex.Message });
+            }
+
         }
 
     }

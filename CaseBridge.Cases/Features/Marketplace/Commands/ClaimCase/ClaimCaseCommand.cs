@@ -34,8 +34,9 @@ namespace CaseBridge_Cases.Features.Marketplace.Commands.ClaimCase
                 throw new Exception("This case is no longer available.");
 
             CaseToClaim.Status =CaseStatus.InReview ;
-            CaseToClaim.AcceptedByuserid = request.LawyerId;
+            CaseToClaim.AcceptedByUserId = request.LawyerId;
             CaseToClaim.AssignedFirmId = request.FirmId;
+            CaseToClaim.LastModifiedByUserId = request.LawyerId;
 
             await _Context.SaveChangesAsync(cancellationToken);
 

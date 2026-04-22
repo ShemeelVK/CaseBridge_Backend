@@ -4,6 +4,7 @@ using CaseBridge_Cases.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace CaseBridge_Cases.Migrations
 {
     [DbContext(typeof(CaseDbContext))]
-    partial class CaseDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260422061848_AddCaseHistoryTable")]
+    partial class AddCaseHistoryTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -30,7 +33,7 @@ namespace CaseBridge_Cases.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int?>("AcceptedByUserId")
+                    b.Property<int?>("AcceptedByuserid")
                         .HasColumnType("int");
 
                     b.Property<int?>("AssignedFirmId")
@@ -49,9 +52,6 @@ namespace CaseBridge_Cases.Migrations
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("LastModifiedByUserId")
-                        .HasColumnType("int");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -77,16 +77,8 @@ namespace CaseBridge_Cases.Migrations
                     b.Property<int>("CaseId")
                         .HasColumnType("int");
 
-                    b.Property<string>("Category")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime>("ChangedAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.Property<int>("ModifiedByUserId")
                         .HasColumnType("int");
@@ -96,10 +88,6 @@ namespace CaseBridge_Cases.Migrations
 
                     b.Property<int>("PreviousStatus")
                         .HasColumnType("int");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 

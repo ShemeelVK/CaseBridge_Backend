@@ -9,6 +9,7 @@ namespace CaseBridge_Cases.Features.Lawyer.Commands.CloseCase
     {
         public int FirmId { get; set;}
         public int CaseId { get; set; }
+        public int UserId { get; set; }
     }
 
     public class CloseCaseHandler : IRequestHandler<CloseCaseCommand,bool>
@@ -35,6 +36,7 @@ namespace CaseBridge_Cases.Features.Lawyer.Commands.CloseCase
                 throw new Exception("This case is already closed.");
 
             caseToClose.Status = CaseStatus.Closed;
+            caseToClose.LastModifiedByUserId = command.UserId;
 
             await _context.SaveChangesAsync(cancellationToken);
 
