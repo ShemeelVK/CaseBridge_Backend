@@ -24,6 +24,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Features\Chat\Commands\" />
+    <Folder Include="Features\Chat\Queries\" />
     <Folder Include="Repositories\" />
   </ItemGroup>
 

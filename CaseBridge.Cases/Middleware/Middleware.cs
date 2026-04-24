@@ -1,0 +1,46 @@
+﻿using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+
+namespace CaseBridge_Cases.Middleware
+{
+    public class GlobalExceptionHandler : IExceptionHandler
+    {
+        private readonly ILogger<GlobalExceptionHandler> _logger;
+
+        public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger)
+        {
+            _logger = logger; 
+        }
+
+        public async ValueTask<bool> TryHandleAsync(
+            HttpContext context,
+            Exception exception,
+            CancellationToken cancellationToken)
+        {
+            _logger.LogError(exception, "Exception occurred: {Message}", exception.Message); //for console
+
+            var problemDetails = new ProblemDetails
+            {
+                Status = StatusCodes.Status500InternalServerError,
+                Title = "Server Error",
+                Detail = exception.Message
+            };
+
+            if (exception is UnauthorizedAccessException)
+            {
+                problemDetails.Status = StatusCodes.Status403Forbidden;
+                problemDetails.Title = "Forbidden Access";
+            }
+
+            context.Response.StatusCode = problemDetails.Status.Value;
+
+            await context.Response.WriteAsJsonAsync(problemDetails, cancellationToken);
+
+            return true;
+
+
+        }
+
+    }
+}

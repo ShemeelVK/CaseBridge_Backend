@@ -5,6 +5,7 @@ using CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCases;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 // For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
 
@@ -45,6 +46,8 @@ namespace CaseBridge_Cases.Controllers
         {
             var seniorIdClaim = User.FindFirst("SeniorId")?.Value;
 
+            var actualUserIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
             if (string.IsNullOrEmpty(seniorIdClaim))
             {
                 return Unauthorized(new { Message = "Senior ID is missing from your security token." });
@@ -54,7 +57,7 @@ namespace CaseBridge_Cases.Controllers
             {
                 CaseId = id,
                 FirmId = int.Parse(seniorIdClaim),
-                UserId=int.Parse(seniorIdClaim)
+                UserId=int.Parse(actualUserIdClaim)
             };
 
             try
@@ -81,6 +84,8 @@ namespace CaseBridge_Cases.Controllers
         {
             var seniorIdClaim = User.FindFirst("SeniorId")?.Value;
 
+            var actualUserIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
             if (string.IsNullOrEmpty(seniorIdClaim))
             {
                 return Unauthorized(new { Message = "Senior ID is missing from your security token." });
@@ -90,7 +95,7 @@ namespace CaseBridge_Cases.Controllers
             {
                 CaseId = id,
                 FirmId = int.Parse(seniorIdClaim),
-                UserId = int.Parse(seniorIdClaim)
+                UserId = int.Parse(actualUserIdClaim)
             };
 
             try

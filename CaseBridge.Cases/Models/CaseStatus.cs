@@ -2,8 +2,8 @@
 {
     public enum CaseStatus
     {
-        Open,
-        InReview,
-        Closed
+        Open=1,
+        InReview=2,
+        Closed=3
     }
 }

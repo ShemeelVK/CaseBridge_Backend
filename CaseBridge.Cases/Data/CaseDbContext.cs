@@ -11,6 +11,7 @@ namespace CaseBridge_Cases.Data
 
         public DbSet<Case> Cases { get; set; }
         public DbSet<CaseHistory> CaseHistories { get; set; }
+        public DbSet<ChatMessage> ChatMessages { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -19,6 +20,14 @@ namespace CaseBridge_Cases.Data
             // Tell EF Core to save the Enum as a readable String in the database
             modelBuilder.Entity<Case>()
                 .Property(c => c.Status)
+                .HasConversion<string>();
+
+            modelBuilder.Entity<CaseHistory>()
+              .Property(h => h.PreviousStatus)
+              .HasConversion<string>();
+
+            modelBuilder.Entity<CaseHistory>()
+                .Property(h => h.NewStatus)
                 .HasConversion<string>();
         }
 

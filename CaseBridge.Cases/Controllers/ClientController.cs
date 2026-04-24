@@ -2,11 +2,13 @@
 using CaseBridge_Cases.Features.Client.Command.PostCase;
 using CaseBridge_Cases.Features.Client.Queries.GetClientCases;
 using CaseBridge_Cases.Models;
+using CaseBridge_Cases.DTO;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using System.Collections;
 
 namespace CaseBridge_Cases.Controllers
 {
@@ -38,7 +40,7 @@ namespace CaseBridge_Cases.Controllers
         }
 
         [HttpGet("get-cases")]
-        public async Task<IActionResult> GetClientCases()
+        public async Task<ActionResult<IEnumerable<CaseDTO>>> GetClientCases()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
