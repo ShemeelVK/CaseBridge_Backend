@@ -14,7 +14,7 @@ namespace CaseBridge_Cases.Controllers
 {
     [ApiController]
     [Route("api/v1/[controller]")]
-    [Authorize]
+    [Authorize(Roles ="Client")]
     public class ClientController : ControllerBase
     {
         private readonly IMediator _mediator;

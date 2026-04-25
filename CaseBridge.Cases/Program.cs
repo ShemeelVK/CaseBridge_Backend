@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.SqlServer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using CaseBridge_Cases.Features.Chat.Hubs;
 using System.Text;
 
 namespace CaseBridge.Cases
@@ -81,6 +82,7 @@ namespace CaseBridge.Cases
 
             builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
             builder.Services.AddProblemDetails();
+            builder.Services.AddSignalR();
 
             var app = builder.Build();
 
@@ -99,6 +101,7 @@ namespace CaseBridge.Cases
 
 
             app.MapControllers();
+            app.MapHub<CaseChatHub>("/case-chat-hub");
 
             app.Run();
         }

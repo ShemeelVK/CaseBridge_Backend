@@ -2,6 +2,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
+using CaseBridge_Cases.Features.Chat.Commands;
+using CaseBridge_Cases.Features.Chat.Queries;
 
 namespace CaseBridge_Cases.Features.Chat.Hubs
 {
@@ -18,6 +20,36 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
         // Frontend passes the caseid and the type of room (internal or external)
         public async Task JoinCaseRoom(int caseId, string roomType)
         {
+
+            var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
+            var firmId = Context.User?.FindFirst("SeniorId")?.Value;
+
+            if (userId == null || role == null)
+            {
+                Context.Abort(); // Kicks them out immediately
+                return;
+            }
+
+            //We ask the database if this person is allowed in.
+            //will need to create this simple Dapper query in Queries folder
+
+            var hasAccess = await _mediator.Send(new ValidateChatAccessQuery
+            {
+                CaseId = caseId,
+                UserId = int.Parse(userId),
+                FirmId = firmId != null ? int.Parse(firmId) : null,
+                Role = role,
+                RoomType = roomType
+            });
+
+            if (!hasAccess)
+            {
+                // Send an error message directly back to the person trying to sneak in
+                await Clients.Caller.SendAsync("ReceiveSystemMessage", "Access Denied: You must claim this case first.");
+                return; // Stop them from joining the group
+            }
+
             //if roomtype is internal, making sure the user is not client
             string roomName = $"CaseRoom-{caseId}-{roomType}";
             await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
@@ -26,14 +58,29 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
         public async Task SendMessage(int caseId,string roomType,string message)
         {
             var userId=Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown User";
+
             if (userId == null) return;
+            if(string.IsNullOrEmpty(userName) ) return;
+
+            int SenderId = int.Parse(userId);
+
+            var command = new SendMessage
+            {
+                CaseId = caseId,
+                SenderId = SenderId,
+                SenderName = userName,
+                RoomType = roomType,
+                MessageText = message
+
+            };
+
+            await _mediator.Send(command);
 
             string roomName = $"CaseRoom-{caseId}-{roomType}";
 
-            // TODO: Call MediatR to save to database:
-             //await _mediator.Send(new SendMessageCommand { CaseId = caseId, RoomType = roomType, ... });
-
-            await Clients.Group(roomName).SendAsync("ReceiveMessage",userId,message);
+            //sending back the senderName to the frontend
+            await Clients.Group(roomName).SendAsync("ReceiveMessage",userName,message);
         }
     }
 }

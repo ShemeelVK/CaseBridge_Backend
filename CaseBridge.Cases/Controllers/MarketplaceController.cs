@@ -39,7 +39,7 @@ namespace CaseBridge_Cases.Controllers
         }
 
         [HttpPut("cases/{id}/claim")]
-        [Authorize]
+        [Authorize(Roles ="Lawyer,Junior")]
         public async Task<IActionResult> ClaimCase(int id)
         {
             var lawyerIdClaim = User.FindFirst("UserId")?.Value;

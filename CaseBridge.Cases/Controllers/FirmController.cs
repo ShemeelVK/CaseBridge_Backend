@@ -13,7 +13,7 @@ namespace CaseBridge_Cases.Controllers
 {
     [ApiController]
     [Route("api/v1/[controller]")]
-    [Authorize]
+    [Authorize(Roles ="Lawyer,Junior")]
     public class FirmController : ControllerBase
     {
         private readonly IMediator _mediator;
