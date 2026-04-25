@@ -26,7 +26,7 @@ namespace CaseBridge_Users.Controllers
         public async Task<IActionResult> AddJuniorAssociate([FromBody] AddJuniorDto dto)
         {
             //extract id from token
-            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var userIdClaim = User.FindFirst("UserId") ?? User.FindFirst(ClaimTypes.NameIdentifier);
             if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int callerId))
             {
                 return Unauthorized("Invalid Token Data");
@@ -89,7 +89,7 @@ namespace CaseBridge_Users.Controllers
 
             await _userRepository.UpdateFirmBioAsync(callerId, firmBio);
             return Ok(new { Message = "Firm bio updated successfully." });
-        }
+        }   
 
 
     }

@@ -7,6 +7,7 @@
         public string Title { get; set; }
         public string Description { get; set; }
         public string Category { get; set; }
+        public decimal Budget { get; set; }
         public CaseStatus Status { get; set; } = CaseStatus.Open;
         public int? AssignedFirmId { get; set; }
         public int? AcceptedByUserId{ get; set; }

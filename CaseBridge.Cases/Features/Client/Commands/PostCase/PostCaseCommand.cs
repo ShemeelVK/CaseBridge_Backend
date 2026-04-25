@@ -13,6 +13,7 @@ namespace CaseBridge_Cases.Features.Client.Command.PostCase
         public string Title { get; set; } = string.Empty;
         public string Description { get; set; } = string.Empty;
         public string Category { get; set; } = string.Empty;
+        public decimal Budget { get; set; }
     }
 
     public class PostCaseHandler : IRequestHandler<PostCaseCommand, int>
@@ -32,6 +33,7 @@ namespace CaseBridge_Cases.Features.Client.Command.PostCase
                 Description = request.Description,
                 Category = request.Category,
                 Status = CaseStatus.Open, // Always starts as Open for the marketplace
+                Budget=request.Budget,
                 CreatedAt = DateTime.UtcNow,
                 LastModifiedByUserId = request.ClientId
                 // AssignedFirmId and AcceptedByUserId remain null until a lawyer claims it

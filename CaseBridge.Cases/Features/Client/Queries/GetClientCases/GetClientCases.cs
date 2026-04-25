@@ -25,7 +25,7 @@ namespace CaseBridge_Cases.Features.Client.Queries.GetClientCases
             using var connection = _dapperContext.GetConnection();
 
             var sql = @"
-                SELECT Id, Title, Description, Status, ClientId, CreatedAt 
+                SELECT Id, Title, Description, Status, Budget, ClientId, CreatedAt 
                 FROM Cases 
                 WHERE ClientId = @ClientId 
                 ORDER BY CreatedAt DESC";

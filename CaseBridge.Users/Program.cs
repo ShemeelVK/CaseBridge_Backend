@@ -89,6 +89,8 @@ namespace CaseBridge.Users
                 app.UseSwaggerUI();
             }
 
+            app.UseRouting();
+            app.UseAuthentication();
             app.UseAuthorization();
 
 
