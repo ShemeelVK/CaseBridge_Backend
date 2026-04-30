@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using System.Security.Claims;
@@ -55,13 +55,13 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
             await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
         }
 
-        public async Task SendMessage(int caseId,string roomType,string message)
+        public async Task SendMessage(int caseId, string roomType, string message, int? parentMessageId = null)
         {
-            var userId=Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown User";
 
             if (userId == null) return;
-            if(string.IsNullOrEmpty(userName) ) return;
+            if (string.IsNullOrEmpty(userName)) return;
 
             int SenderId = int.Parse(userId);
 
@@ -71,16 +71,24 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
                 SenderId = SenderId,
                 SenderName = userName,
                 RoomType = roomType,
-                MessageText = message
-
+                MessageText = message,
+                ParentMessageId = parentMessageId
             };
 
-            await _mediator.Send(command);
+            var messageId = await _mediator.Send(command);
 
             string roomName = $"CaseRoom-{caseId}-{roomType}";
 
-            //sending back the senderName to the frontend
-            await Clients.Group(roomName).SendAsync("ReceiveMessage",userName,message);
+            // Broadcast the message with its ID and parent ID
+            await Clients.Group(roomName).SendAsync("ReceiveMessage", new
+            {
+                id = messageId,
+                senderId = SenderId,
+                senderName = userName,
+                text = message,
+                parentMessageId = parentMessageId,
+                timestamp = DateTime.UtcNow
+            });
         }
     }
 }

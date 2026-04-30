@@ -17,9 +17,11 @@ namespace CaseBridge_Users.Controllers
     public class SeniorController : ControllerBase
     {
         private readonly UserRepository _userRepository;
-        public SeniorController(UserRepository userRepository)
+        private readonly EmailService _emailService;
+        public SeniorController(UserRepository userRepository, EmailService emailService)
         {
             _userRepository = userRepository;
+            _emailService = emailService;
         }
 
         [HttpPost("add-junior")]
@@ -63,6 +65,8 @@ namespace CaseBridge_Users.Controllers
             {
                 return BadRequest("Failed to add junior. Email or Enrollment number may already exist");
             }
+
+            await _emailService.SendVerificationEmailAsync(dto.Email, dto.FullName, verificationToken);
 
             return Ok(new {Message= "Junior Associate successfully added to your firm." });
         }

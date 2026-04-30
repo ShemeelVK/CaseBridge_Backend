@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using CaseBridge_Cases.Models;
 using CaseBridge_Cases.Data;
 
@@ -12,7 +12,8 @@ namespace CaseBridge_Cases.Features.Chat.Commands
         public int SenderId { get; set; }
         public string SenderName { get; set; }=string.Empty;
         public string RoomType { get; set; } = string.Empty;
-        public string MessageText { get; set; }= string.Empty;
+        public string MessageText { get; set; } = string.Empty;
+        public int? ParentMessageId { get; set; }
     }
 
     public class SendMessageCommandHandler : IRequestHandler<SendMessage, int>
@@ -33,6 +34,7 @@ namespace CaseBridge_Cases.Features.Chat.Commands
                 SenderName = request.SenderName,
                 RoomType = request.RoomType,
                 MessageText = request.MessageText,
+                ParentMessageId = request.ParentMessageId,
                 SendAt = DateTime.UtcNow
             };
 

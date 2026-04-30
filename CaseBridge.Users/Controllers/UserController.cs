@@ -1,4 +1,4 @@
-﻿using CaseBridge_Users.DTOs.Auth;
+using CaseBridge_Users.DTOs.Auth;
 using CaseBridge_Users.Models;
 using CaseBridge_Users.Repositories;
 using CaseBridge_Users.Services;
@@ -58,6 +58,8 @@ namespace CaseBridge_Users.Controllers
 
             if (!success) return BadRequest("Email might already be in use.");
 
+            await _emailService.SendVerificationEmailAsync(user.Email, user.FullName, verificationToken);
+
             return Ok(new { Message = "Client account created. Please check your email for verification." });
         }
 
@@ -84,17 +86,7 @@ namespace CaseBridge_Users.Controllers
             var success = await _userRepository.RegisterLawyerAsync(user, profile, dto.Password,verificationToken);
             if (!success) return BadRequest("Registration failed.");
 
-            try
-            {
-                // 2. Attempt Email Send
-                var verifyLink = $"http://localhost:3000/verify-email?token={verificationToken}&email={user.Email}";
-                await _emailService.SendEmailAsync(user.Email, "Verify your CaseBridge Account",
-                    $"Welcome! Click here to verify: <a href='{verifyLink}'>Verify Now</a>");
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, "Account created, but we couldn't send the verification email. Please use 'Forgot Password' to trigger a new link.");
-            }
+            await _emailService.SendVerificationEmailAsync(user.Email, user.FullName, verificationToken);
 
             return Ok(new { Message = "Registration successful! Check your inbox." });
         }
@@ -143,7 +135,9 @@ namespace CaseBridge_Users.Controllers
                 AccessToken = accessToken, 
                 RefreshToken = refreshToken,
                 UserType = user.UserType,
-                FullName = user.FullName 
+                FullName = user.FullName,
+                Email = user.Email,
+                Id = user.Id
             });
         }
 
@@ -183,10 +177,15 @@ namespace CaseBridge_Users.Controllers
                 var payload = await GoogleJsonWebSignature.ValidateAsync(dto.IdToken, settings);
 
                 //initial lookup using email
-                var (user, security) = await _userRepository.GetUserWithSecurityAsync(payload.Email);
+                var email = payload.Email?.ToLower().Trim() ?? string.Empty;
+                var (user, security) = await _userRepository.GetUserWithSecurityAsync(email);
 
                 if (user == null)
                 {
+                    if (dto.LoginOnly)
+                    {
+                        return NotFound("User not found. Please complete registration.");
+                    }
                     
                     user = new User
                     {
@@ -200,9 +199,10 @@ namespace CaseBridge_Users.Controllers
                     {
                         var newProfile = new LawyerProfile
                         {
-                            EnrollmentNumber = "G-" + Guid.NewGuid().ToString().Substring(0, 8), // Placeholder
-                            Specialization = "To be specified",
-                            SeniorLawyerId=dto.SeniorLawyerId
+                            EnrollmentNumber = dto.EnrollmentNumber,
+                            Specialization = dto.Specialization ?? "To be specified",
+                            FirmBio = dto.FirmBio,
+                            SeniorLawyerId = dto.SeniorLawyerId
                         };
                         // Register using the 3-table transaction
                         await _userRepository.RegisterLawyerAsync(user, newProfile, string.Empty, string.Empty);
@@ -211,14 +211,16 @@ namespace CaseBridge_Users.Controllers
                     {
                         var newClientProfile = new ClientProfile
                         {
-                            ClientType = "Individual"
+                            PhoneNumber = dto.PhoneNumber,
+                            Address = dto.Address,
+                            ClientType = dto.ClientType ?? "Individual"
                         };
 
                         // FIX: Register using the 3-table transaction (Client) - Passing all 4 arguments
                         await _userRepository.RegisterClientAsync(user, newClientProfile, string.Empty, string.Empty);
                     }
 
-                    (_, security) = await _userRepository.GetUserWithSecurityAsync(payload.Email);
+                    (_, security) = await _userRepository.GetUserWithSecurityAsync(email);
                     security!.IsEmailVerified = true;
                     await _userRepository.UpdateSecurityStatusAsync(security);
                 }
@@ -245,7 +247,9 @@ namespace CaseBridge_Users.Controllers
                     AccessToken = token,
                     RefreshToken = refreshToken,
                     UserType = user.UserType,
-                    FullName = user.FullName
+                    FullName = user.FullName,
+                    Email = user.Email,
+                    Id = user.Id
                 });
             }
             catch (InvalidJwtException) { return BadRequest("Invalid Google token."); }
@@ -264,16 +268,7 @@ namespace CaseBridge_Users.Controllers
 
             await _userRepository.UpdateSecurityStatusAsync(security);
 
-            try
-            {
-                var resetLink = $"http://localhost:3000/reset-password?token={resetToken}&email={user.Email}";
-                await _emailService.SendResetPasswordEmailAsync(user.Email, user.FullName, resetLink, 15);
-            }
-            catch (Exception ex)
-            {
-                // Just log it.
-                Console.WriteLine($"Email failed: {ex.Message}");
-            }
+            await _emailService.SendResetPasswordEmailAsync(user.Email, user.FullName, resetToken, 15);
 
             return Ok("Reset link generated in database.");
         }
@@ -294,8 +289,7 @@ namespace CaseBridge_Users.Controllers
             }
 
 
-            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
-            await _userRepository.UpdateUserAsync(user); // Ensure this updates the PasswordHash column
+            security.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.NewPassword);
 
            
             security.PasswordResetToken = null;

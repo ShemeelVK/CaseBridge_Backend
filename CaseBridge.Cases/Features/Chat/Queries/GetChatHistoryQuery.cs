@@ -1,4 +1,4 @@
-﻿using CaseBridge_Cases.DTO;
+using CaseBridge_Cases.DTO;
 using CaseBridge_Cases.Data;
 using MediatR;
 using Dapper;
@@ -29,7 +29,8 @@ namespace CaseBridge_Cases.Features.Chat.Queries
                     SenderId, 
                     SenderName, 
                     MessageText, 
-                    SendAt 
+                    SendAt,
+                    ParentMessageId
                 FROM ChatMessages 
                 WHERE CaseId = @CaseId AND RoomType = @RoomType 
                 ORDER BY SendAt ASC";

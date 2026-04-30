@@ -1,4 +1,4 @@
-﻿namespace CaseBridge_Cases.Models
+namespace CaseBridge_Cases.Models
 {
     public class ChatMessage
     {
@@ -9,5 +9,6 @@
         public string RoomType { get; set; } = string.Empty;
         public string MessageText { get; set; } = string.Empty;
         public DateTime SendAt { get; set; } = DateTime.UtcNow;
+        public int? ParentMessageId { get; set; } // For replying to a specific message
     }
 }

@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Dapper;
 using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Models;
@@ -9,6 +9,8 @@ namespace CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCases
     public class GetFirmCasesQuery : IRequest<IEnumerable<CaseDTO>>
     {
         public int FirmId { get; set; }
+        public int UserId { get; set; }
+        public bool IsSenior { get; set; }
     }
 
     public class GetFirmCaseHandler : IRequestHandler<GetFirmCasesQuery, IEnumerable<CaseDTO>>
@@ -19,7 +21,7 @@ namespace CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCases
             _dapper = dapper;
         }
 
-        public async Task<IEnumerable<CaseDTO>> Handle(GetFirmCasesQuery requst,CancellationToken cancellation)
+        public async Task<IEnumerable<CaseDTO>> Handle(GetFirmCasesQuery request, CancellationToken cancellation)
         {
             using var connection = _dapper.GetConnection();
 
@@ -37,10 +39,16 @@ namespace CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCases
                     CreatedAt, 
                     LastModifiedByUserId 
                 FROM Cases 
-                WHERE AssignedFirmId = @FirmId 
-                ORDER BY CreatedAt DESC";
+                WHERE AssignedFirmId = @FirmId";
 
-            return await connection.QueryAsync<CaseDTO>(sql, new { FirmId = requst.FirmId });
+            if (!request.IsSenior)
+            {
+                sql += " AND AcceptedByUserId = @UserId";
+            }
+
+            sql += " ORDER BY CreatedAt DESC";
+
+            return await connection.QueryAsync<CaseDTO>(sql, new { FirmId = request.FirmId, UserId = request.UserId });
         }
     }
 }

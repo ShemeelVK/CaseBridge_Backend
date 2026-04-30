@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace CaseBridge_Users.DTOs.Auth
 {
@@ -50,6 +50,16 @@ namespace CaseBridge_Users.DTOs.Auth
         public string IdToken { get; set; } = string.Empty;
         public string UserType { get; set; } = "Client";
         public int? SeniorLawyerId { get; set; } // If a Junior registers via Google
+        
+        // Additional optional fields for two-step registration
+        public string? EnrollmentNumber { get; set; }
+        public string? Specialization { get; set; }
+        public string? FirmBio { get; set; }
+        public string? PhoneNumber { get; set; }
+        public string? Address { get; set; }
+        public string? ClientType { get; set; }
+        
+        public bool LoginOnly { get; set; } = false;
     }
     public class ForgotPasswordRequest 
     {

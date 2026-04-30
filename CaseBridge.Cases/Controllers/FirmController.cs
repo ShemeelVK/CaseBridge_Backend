@@ -1,4 +1,4 @@
-﻿using CaseBridge_Cases.Data;
+using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Features.Lawyer.Commands.CloseCase;
 using CaseBridge_Cases.Features.Lawyer.Commands.DropCase;
 using CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCases;
@@ -27,18 +27,25 @@ namespace CaseBridge_Cases.Controllers
         public async Task<IActionResult> GetMyFirmCases()
         {
             var firmIdClaim = User.FindFirst("SeniorId")?.Value;
+            var userIdClaim = User.FindFirst("UserId")?.Value;
 
-            if (string.IsNullOrEmpty(firmIdClaim))
+            if (string.IsNullOrEmpty(firmIdClaim) || string.IsNullOrEmpty(userIdClaim))
             {
-                return Unauthorized(new { Message = "Firm ID is missing from your security token." });
+                return Unauthorized(new { Message = "Firm ID or User ID is missing from your security token." });
             }
 
             int secureFirmId = int.Parse(firmIdClaim);
+            int secureUserId = int.Parse(userIdClaim);
+            bool isSenior = User.IsInRole("Lawyer");
 
-            var cases = await _mediator.Send(new GetFirmCasesQuery { FirmId = secureFirmId });
+            var cases = await _mediator.Send(new GetFirmCasesQuery 
+            { 
+                FirmId = secureFirmId, 
+                UserId = secureUserId, 
+                IsSenior = isSenior 
+            });
 
             return Ok(cases);
-
         }
 
         [HttpPut("cases/{id}/close-case")]

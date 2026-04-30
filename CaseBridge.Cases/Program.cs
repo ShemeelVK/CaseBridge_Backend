@@ -34,6 +34,18 @@ namespace CaseBridge.Cases
             options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
             );
 
+            // Configure CORS
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowReactApp", policy =>
+                {
+                    policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
+                          .AllowAnyHeader()
+                          .AllowAnyMethod()
+                          .AllowCredentials();
+                });
+            });
+
             builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
            .AddJwtBearer(options =>
             {
@@ -95,6 +107,7 @@ namespace CaseBridge.Cases
                 app.UseSwaggerUI();
             }
 
+            app.UseCors("AllowReactApp");
             app.UseAuthentication();
 
             app.UseAuthorization();

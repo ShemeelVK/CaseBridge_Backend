@@ -25,6 +25,18 @@ namespace CaseBridge.Users
             builder.Services.AddScoped<TokenService>();
             builder.Services.AddTransient<EmailService>();
 
+            // Configure CORS
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowReactApp", policy =>
+                {
+                    policy.WithOrigins("http://localhost:5173", "http://localhost:3000")
+                          .AllowAnyHeader()
+                          .AllowAnyMethod()
+                          .AllowCredentials();
+                });
+            });
+
             // Configure Authentication
             builder.Services.AddAuthentication("Bearer")
                 .AddJwtBearer(options => {
@@ -90,6 +102,7 @@ namespace CaseBridge.Users
             }
 
             app.UseRouting();
+            app.UseCors("AllowReactApp");
             app.UseAuthentication();
             app.UseAuthorization();
 
