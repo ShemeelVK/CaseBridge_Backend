@@ -1,4 +1,4 @@
-﻿using CaseBridge_Cases.Data;
+using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Features.Client.Command.PostCase;
 using CaseBridge_Cases.Features.Client.Queries.GetClientCases;
 using CaseBridge_Cases.Models;
@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using System.Collections;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace CaseBridge_Cases.Controllers
 {
@@ -27,13 +28,19 @@ namespace CaseBridge_Cases.Controllers
         public async Task<IActionResult> PostNewCase([FromBody] PostCaseCommand command)
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            
+            // Check both standard and JWT specific name claims
+            var userNameClaim = User.FindFirst(ClaimTypes.Name)?.Value 
+                              ?? User.FindFirst("name")?.Value 
+                              ?? User.FindFirst(JwtRegisteredClaimNames.Name)?.Value;
 
             if (string.IsNullOrEmpty(userIdClaim))
             {
                 return Unauthorized(new { Message = "User ID is missing from your security token." });
             }
 
-            command.ClientId=int.Parse(userIdClaim);
+            command.ClientId = int.Parse(userIdClaim);
+            command.ClientName = userNameClaim ?? "Unknown Client";
 
             var newCaseId = await _mediator.Send(command);
             return Ok(new { Message = "Case posted successfully to the marketplace!", CaseId = newCaseId });

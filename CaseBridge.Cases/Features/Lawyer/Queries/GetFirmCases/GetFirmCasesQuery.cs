@@ -29,6 +29,7 @@ namespace CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCases
                 SELECT 
                     Id, 
                     ClientId, 
+                    ClientName,
                     Title, 
                     Description, 
                     Category, 
@@ -36,6 +37,7 @@ namespace CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCases
                     Budget,
                     AssignedFirmId, 
                     AcceptedByUserId, 
+                    LawyerName,
                     CreatedAt, 
                     LastModifiedByUserId 
                 FROM Cases 

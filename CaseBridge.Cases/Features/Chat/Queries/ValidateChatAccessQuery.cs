@@ -1,4 +1,4 @@
-﻿using CaseBridge_Cases.Data;
+using CaseBridge_Cases.Data;
 using Dapper;
 using MediatR;
 using System.Net.NetworkInformation;
@@ -40,7 +40,7 @@ namespace CaseBridge_Cases.Features.Chat.Queries
             if(request.Role=="Client")
             {
                 return caseOwnership.ClientId == request.UserId
-                       && request.RoomType == "External";
+                       && request.RoomType.Equals("external", StringComparison.OrdinalIgnoreCase);
             }
 
             if (request.Role == "Lawyer" || request.Role == "Junior")

@@ -27,7 +27,7 @@ namespace CaseBridge_Cases.Controllers
         public async Task<IActionResult> GetMyFirmCases()
         {
             var firmIdClaim = User.FindFirst("SeniorId")?.Value;
-            var userIdClaim = User.FindFirst("UserId")?.Value;
+            var userIdClaim = User.FindFirst("UserId")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             if (string.IsNullOrEmpty(firmIdClaim) || string.IsNullOrEmpty(userIdClaim))
             {

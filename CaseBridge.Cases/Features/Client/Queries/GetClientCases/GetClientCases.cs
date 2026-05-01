@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Models;
 using CaseBridge_Cases.DTO;
@@ -25,7 +25,7 @@ namespace CaseBridge_Cases.Features.Client.Queries.GetClientCases
             using var connection = _dapperContext.GetConnection();
 
             var sql = @"
-                SELECT Id, Title, Description, Status, Budget, ClientId, CreatedAt 
+                SELECT Id, Title, Description, Status, Budget, ClientId, ClientName, LawyerName, CreatedAt, AssignedFirmId 
                 FROM Cases 
                 WHERE ClientId = @ClientId 
                 ORDER BY CreatedAt DESC";

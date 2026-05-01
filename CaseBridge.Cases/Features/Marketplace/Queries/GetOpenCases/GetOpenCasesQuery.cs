@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Models;
 using CaseBridge_Cases.DTO;
@@ -27,6 +27,7 @@ namespace CaseBridge_Cases.Features.Marketplace.Queries.GetOpenCases
                 SELECT 
                     Id, 
                     ClientId, 
+                    ClientName,
                     Title, 
                     Description, 
                     Category, 
@@ -34,6 +35,7 @@ namespace CaseBridge_Cases.Features.Marketplace.Queries.GetOpenCases
                     Budget,
                     AssignedFirmId, 
                     AcceptedByUserId, 
+                    LawyerName,
                     CreatedAt, 
                     LastModifiedByUserId 
                 FROM Cases 

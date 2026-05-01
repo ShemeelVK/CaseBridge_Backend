@@ -1,4 +1,4 @@
-﻿using BCrypt.Net;
+using BCrypt.Net;
 using CaseBridge_Users.Data;
 using CaseBridge_Users.Models;
 using Dapper;
@@ -102,7 +102,8 @@ namespace CaseBridge_Users.Repositories
         public async Task<(User?, UserSecurity?)> GetUserWithSecurityAsync(string email)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"SELECT u.*, s.* FROM Users u 
+            var sql = @"SELECT u.*, s.UserId, s.PasswordHash, s.IsEmailVerified, s.VerificationToken, s.FailedLoginAttempts, s.LockoutEnd, s.RefreshToken, s.RefreshTokenExpiryTime
+                        FROM Users u 
                         JOIN UserSecurity s ON u.Id = s.UserId 
                         WHERE u.Email = @Email";
 
@@ -120,7 +121,8 @@ namespace CaseBridge_Users.Repositories
         public async Task<(User?, LawyerProfile?)> GetUserAndProfileAsync(int userId)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"SELECT u.*, p.* FROM Users u 
+            var sql = @"SELECT u.*, p.UserId, p.SeniorLawyerId, p.EnrollmentNumber, p.Specialization, p.FirmBio, p.IsVerified 
+                        FROM Users u 
                         LEFT JOIN LawyerProfiles p ON u.Id = p.UserId 
                         WHERE u.Id = @UserId";
 
@@ -128,7 +130,7 @@ namespace CaseBridge_Users.Repositories
                 sql,
                 (u, p) => (u, p),
                 new { UserId = userId },
-                splitOn: "Id"
+                splitOn: "UserId"
             );
 
             return result.FirstOrDefault();
@@ -249,7 +251,7 @@ namespace CaseBridge_Users.Repositories
         public async Task<dynamic?> GetSeniorForJuniorAsync(int juniorId)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"SELECT senior.FullName, senior.Email, p_senior.Specialization, p_senior.FirmBio
+            var sql = @"SELECT senior.Id, senior.FullName, senior.Email, p_senior.Specialization, p_senior.FirmBio
                 FROM Users junior
                 JOIN LawyerProfiles p_junior ON junior.Id = p_junior.UserId
                 JOIN Users senior ON p_junior.SeniorLawyerId = senior.Id

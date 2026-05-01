@@ -17,59 +17,107 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
             _mediator = mediator;
         }
 
-        // Frontend passes the caseid and the type of room (internal or external)
-        public async Task JoinCaseRoom(int caseId, string roomType)
+        public async Task JoinCaseRoom(int caseId, string roomType = "external", int? targetUserId = null)
         {
+            var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? Context.User?.FindFirst("UserId")?.Value;
+            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value ?? Context.User?.FindFirst("role")?.Value;
+            var firmIdStr = Context.User?.FindFirst("SeniorId")?.Value;
 
-            var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var role = Context.User?.FindFirst(ClaimTypes.Role)?.Value;
-            var firmId = Context.User?.FindFirst("SeniorId")?.Value;
-
-            if (userId == null || role == null)
+            if (userIdStr == null || role == null)
             {
-                Context.Abort(); // Kicks them out immediately
+                Context.Abort();
                 return;
             }
 
-            //We ask the database if this person is allowed in.
-            //will need to create this simple Dapper query in Queries folder
+            int userId = int.Parse(userIdStr);
+            int? firmId=string.IsNullOrEmpty(firmIdStr) ? null : int.Parse(firmIdStr);
+            string roomName;
 
-            var hasAccess = await _mediator.Send(new ValidateChatAccessQuery
+            if (caseId == 0)
             {
-                CaseId = caseId,
-                UserId = int.Parse(userId),
-                FirmId = firmId != null ? int.Parse(firmId) : null,
-                Role = role,
-                RoomType = roomType
-            });
+                if (targetUserId.HasValue)
+                {
+                    // 1-on-1 DM: Use a unique room name for these two users
+                    int id1 = Math.Min(userId, targetUserId.Value);
+                    int id2 = Math.Max(userId, targetUserId.Value);
+                    roomName = $"DM-{id1}-{id2}";
+                }
+                else
+                {
+                    if(firmId==null)
+                    {
+                        Context.Abort();
+                        return;
+                    }
+                    // Firm-wide general chat
+                    roomName = $"FirmRoom-{firmId}";
+                }
+            }
+            else
+            {
+                // Case-specific chat
+                roomName = $"CaseRoom-{caseId}-{roomType}";
 
-            if (!hasAccess)
-            {
-                // Send an error message directly back to the person trying to sneak in
-                await Clients.Caller.SendAsync("ReceiveSystemMessage", "Access Denied: You must claim this case first.");
-                return; // Stop them from joining the group
+                var hasAccess = await _mediator.Send(new ValidateChatAccessQuery
+                {
+                    CaseId = caseId,
+                    UserId = userId,
+                    FirmId = firmId,
+                    Role = role,
+                    RoomType = roomType
+                });
+
+                if (!hasAccess)
+                {
+                    await Clients.Caller.SendAsync("ReceiveSystemMessage", "Access Denied: You are not authorized for this case chat.");
+                    return;
+                }
             }
 
-            //if roomtype is internal, making sure the user is not client
-            string roomName = $"CaseRoom-{caseId}-{roomType}";
             await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
         }
 
-        public async Task SendMessage(int caseId, string roomType, string message, int? parentMessageId = null)
+        public async Task SendMessage(int caseId, string roomType, string message, int? targetUserId = null, int? parentMessageId = null)
         {
-            var userId = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value ?? "Unknown User";
+            var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? Context.User?.FindFirst("UserId")?.Value;
+            var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value ?? Context.User?.FindFirst("name")?.Value ?? "Unknown User";
+            var firmId = Context.User?.FindFirst("SeniorId")?.Value;
 
-            if (userId == null) return;
-            if (string.IsNullOrEmpty(userName)) return;
+            if (userIdStr == null || string.IsNullOrEmpty(userName)) return;
 
-            int SenderId = int.Parse(userId);
+            int userId = int.Parse(userIdStr);
+            string roomName;
+
+            if (caseId == 0 && firmId==null)
+            {
+                if (targetUserId.HasValue)
+                {
+                    int id1 = Math.Min(userId, targetUserId.Value);
+                    int id2 = Math.Max(userId, targetUserId.Value);
+                    roomName = $"DM-{id1}-{id2}";
+                }
+                else
+                {
+                    if(firmId==null)
+                    {
+                        Context.Abort();
+                        return;
+                    }
+                    roomName = $"FirmRoom-{firmId}";
+                }
+            }
+            else
+            {
+                roomName = $"CaseRoom-{caseId}-{roomType}";
+            }
 
             var command = new SendMessage
             {
                 CaseId = caseId,
-                SenderId = SenderId,
+                SenderId = userId,
                 SenderName = userName,
+                ReceiverId = targetUserId,
+                FirmId = string.IsNullOrEmpty(firmId) ? null : int.Parse(firmId),
                 RoomType = roomType,
                 MessageText = message,
                 ParentMessageId = parentMessageId
@@ -77,13 +125,11 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
 
             var messageId = await _mediator.Send(command);
 
-            string roomName = $"CaseRoom-{caseId}-{roomType}";
-
-            // Broadcast the message with its ID and parent ID
             await Clients.Group(roomName).SendAsync("ReceiveMessage", new
             {
                 id = messageId,
-                senderId = SenderId,
+                caseId = caseId,
+                senderId = userId,
                 senderName = userName,
                 text = message,
                 parentMessageId = parentMessageId,

@@ -1,4 +1,4 @@
-﻿using CaseBridge_Cases.Data;
+using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Models;
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +11,7 @@ namespace CaseBridge_Cases.Features.Marketplace.Commands.ClaimCase
         public int CaseId { get; set; }
         public int LawyerId { get; set; }
         public int FirmId { get; set; }
+        public string LawyerName { get; set; } = string.Empty;
     }
 
     public class ClaimCaseHandler : IRequestHandler<ClaimCaseCommand, bool>
@@ -33,9 +34,10 @@ namespace CaseBridge_Cases.Features.Marketplace.Commands.ClaimCase
             if (CaseToClaim.Status != CaseStatus.Open)
                 throw new Exception("This case is no longer available.");
 
-            CaseToClaim.Status =CaseStatus.InReview ;
+            CaseToClaim.Status = CaseStatus.InReview;
             CaseToClaim.AcceptedByUserId = request.LawyerId;
             CaseToClaim.AssignedFirmId = request.FirmId;
+            CaseToClaim.LawyerName = request.LawyerName; // Save lawyer name
             CaseToClaim.LastModifiedByUserId = request.LawyerId;
 
             await _Context.SaveChangesAsync(cancellationToken);

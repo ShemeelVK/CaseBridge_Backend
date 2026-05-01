@@ -1,10 +1,12 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using CaseBridge_Cases.Features.Marketplace.Queries.GetOpenCases;
 using CaseBridge_Cases.Features.Marketplace.Queries.GetCaseById;
 using CaseBridge_Cases.Features.Marketplace.Commands.ClaimCase;
 using MediatR;
+using System.Security.Claims;
+using System.IdentityModel.Tokens.Jwt;
 
 namespace CaseBridge_Cases.Controllers
 {
@@ -42,7 +44,11 @@ namespace CaseBridge_Cases.Controllers
         [Authorize(Roles ="Lawyer,Junior")]
         public async Task<IActionResult> ClaimCase(int id)
         {
-            var lawyerIdClaim = User.FindFirst("UserId")?.Value;
+            var lawyerIdClaim = User.FindFirst("UserId")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            // Check the exact claim name used in the TokenService first
+            var userNameClaim = User.FindFirst(JwtRegisteredClaimNames.Name)?.Value 
+                              ?? User.FindFirst("name")?.Value 
+                              ?? User.FindFirst(ClaimTypes.Name)?.Value;
             var seniorIdClaim = User.FindFirst("SeniorId")?.Value;
 
             if (string.IsNullOrEmpty(lawyerIdClaim) || string.IsNullOrEmpty(seniorIdClaim))
@@ -52,9 +58,10 @@ namespace CaseBridge_Cases.Controllers
 
             var command = new ClaimCaseCommand
             {
-                CaseId= id,
-                LawyerId=int.Parse(lawyerIdClaim),
-                FirmId=int.Parse(seniorIdClaim)
+                CaseId = id,
+                LawyerId = int.Parse(lawyerIdClaim),
+                FirmId = int.Parse(seniorIdClaim),
+                LawyerName = userNameClaim ?? "Unknown Lawyer"
             };
 
             try

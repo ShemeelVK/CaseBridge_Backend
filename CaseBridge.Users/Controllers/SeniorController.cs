@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using CaseBridge_Users.DTOs;
@@ -13,7 +13,7 @@ namespace CaseBridge_Users.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize(Roles ="Lawyer")]
+    [Authorize(Roles ="Lawyer,Junior")]
     public class SeniorController : ControllerBase
     {
         private readonly UserRepository _userRepository;
@@ -75,13 +75,30 @@ namespace CaseBridge_Users.Controllers
         public async Task<IActionResult> GetMyAssociates()
         {
             var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            var seniorIdClaim = User.FindFirst("SeniorId");
+
             if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int callerId))
                 return Unauthorized();
 
-            // Fetch the list of juniors where SeniorLawyerId matches the caller's ID
-            var associates = await _userRepository.GetFirmAssociatesAsync(callerId);
+            // If they have a SeniorId claim, use it. Otherwise, they ARE the senior.
+            int seniorId = seniorIdClaim != null ? int.Parse(seniorIdClaim.Value) : callerId;
 
-            return Ok(associates);
+            // Fetch the list of juniors in the firm
+            var associates = await _userRepository.GetFirmAssociatesAsync(seniorId);
+
+            if (User.IsInRole("Junior"))
+            {
+                // Juniors also need their boss's info to message them
+                var senior = await _userRepository.GetSeniorForJuniorAsync(callerId);
+                return Ok(new 
+                { 
+                    Senior = senior, 
+                    Associates = associates // Colleagues
+                });
+            }
+
+            // Senior only sees associates
+            return Ok(new { Associates = associates });
         }
 
         [HttpPut("firm-bio")]
