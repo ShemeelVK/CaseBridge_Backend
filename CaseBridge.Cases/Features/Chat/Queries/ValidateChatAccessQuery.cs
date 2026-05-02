@@ -45,10 +45,24 @@ namespace CaseBridge_Cases.Features.Chat.Queries
 
             if (request.Role == "Lawyer" || request.Role == "Junior")
             {
-                // firm should have claimed the case, and the lawyer should belong to that firm
-                // If it passes this, they are allowed in both External and Internal rooms.
-                return caseOwnership.AssignedFirmId != null
-                       && caseOwnership.AssignedFirmId == request.FirmId;
+                // Is the case currently assigned to this firm?
+                bool isCurrentlyAssigned = caseOwnership.AssignedFirmId != null && caseOwnership.AssignedFirmId == request.FirmId;
+
+                if (isCurrentlyAssigned)
+                {
+                    return true; // Allowed in both External and Internal rooms
+                }
+
+                // Historical Bypass: If they dropped it, check if they have past messages
+                var pastMessagesSql = @"
+                    SELECT COUNT(1) 
+                    FROM ChatMessages 
+                    WHERE CaseId = @CaseId 
+                    AND (FirmId = @FirmId OR SenderId = @UserId OR ReceiverId = @UserId)";
+                    
+                var pastMessagesCount = await connection.ExecuteScalarAsync<int>(pastMessagesSql, new { request.CaseId, request.FirmId, request.UserId });
+                
+                return pastMessagesCount > 0;
             }
 
             return false;
