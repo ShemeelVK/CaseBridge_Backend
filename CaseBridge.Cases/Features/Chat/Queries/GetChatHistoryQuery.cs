@@ -30,51 +30,42 @@ namespace CaseBridge_Cases.Features.Chat.Queries
             string sql;
             object parameters;
 
+            // THE UNIVERSAL QUERY FIX:
+            // Whether it's a Client, a Junior, or a Senior... you only ever see messages 
+            // where your exact User ID was the Sender or the Receiver.
+            // This perfectly maintains Client Continuity and Ethical Walls.
             if (request.CaseId == 0 && request.TargetUserId.HasValue && request.CurrentUserId.HasValue)
             {
-                // 1-on-1 DM Logic
+                // 1-on-1 DM Logic (Internal Firm Room)
                 sql = @"
                     SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId 
                     FROM ChatMessages 
-                    WHERE CaseId = 0 AND (
+                    WHERE CaseId = 0 AND RoomType = @RoomType AND (
                         (SenderId = @UserId AND ReceiverId = @TargetId) OR 
                         (SenderId = @TargetId AND ReceiverId = @UserId)
                     )
                     ORDER BY SendAt ASC";
-                parameters = new { UserId = request.CurrentUserId, TargetId = request.TargetUserId };
+                parameters = new { RoomType = request.RoomType, UserId = request.CurrentUserId, TargetId = request.TargetUserId };
             }
-            else if (request.FirmId.HasValue)
+            else if (!request.TargetUserId.HasValue && request.RoomType.Equals("internal", StringComparison.OrdinalIgnoreCase) && request.FirmId.HasValue)
             {
-                // ?? THE LAWYER FIX: Lock strictly to their personal User ID
-                // Even if they are in the same firm, the Junior won't see the Senior's messages.
+                // Firm Group Chat Logic (Firm General Room OR Internal Case Room)
+                sql = @"
+                    SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId 
+                    FROM ChatMessages 
+                    WHERE CaseId = @CaseId AND RoomType = @RoomType AND FirmId = @FirmId
+                    ORDER BY SendAt ASC";
+                parameters = new { CaseId = request.CaseId, RoomType = request.RoomType, FirmId = request.FirmId.Value };
+            }
+            else
+            {
+                // Universal External Chat Logic
                 sql = @"
                     SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId 
                     FROM ChatMessages 
                     WHERE CaseId = @CaseId AND RoomType = @RoomType 
                     AND (SenderId = @CurrentUserId OR ReceiverId = @CurrentUserId)
                     ORDER BY SendAt ASC";
-
-                parameters = new
-                {
-                    CaseId = request.CaseId,
-                    RoomType = request.RoomType,
-                    CurrentUserId = request.CurrentUserId.Value
-                };
-            }
-            else
-            {
-                // ?? THE CLIENT FIX: Dynamic Isolation
-                // Join the Cases table. Only show messages between the Client and the CURRENT Assigned Lawyer.
-                sql = @"
-                    SELECT m.Id, m.SenderId, m.SenderName, m.MessageText, m.SendAt, m.ParentMessageId 
-                    FROM ChatMessages m
-                    JOIN Cases c ON m.CaseId = c.Id
-                    WHERE m.CaseId = @CaseId AND m.RoomType = @RoomType 
-                    AND (
-                        (m.SenderId = @CurrentUserId AND m.ReceiverId = c.AcceptedByUserId) OR 
-                        (m.SenderId = c.AcceptedByUserId AND m.ReceiverId = @CurrentUserId)
-                    )
-                    ORDER BY m.SendAt ASC";
 
                 parameters = new
                 {

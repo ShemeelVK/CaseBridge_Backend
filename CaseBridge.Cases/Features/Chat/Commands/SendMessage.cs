@@ -38,6 +38,10 @@ namespace CaseBridge_Cases.Features.Chat.Commands
                     // If the Sender is the Client, the Receiver MUST be the active Lawyer
                     if (request.SenderId == caseObj.ClientId)
                     {
+                        if (caseObj.AcceptedByUserId == null)
+                        {
+                            throw new InvalidOperationException("Cannot send messages until a lawyer has claimed the case.");
+                        }
                         // Use AcceptedByUserId or AssignedFirmId depending on your exact Cases model properties
                         request.ReceiverId = caseObj.AcceptedByUserId;
                     }
