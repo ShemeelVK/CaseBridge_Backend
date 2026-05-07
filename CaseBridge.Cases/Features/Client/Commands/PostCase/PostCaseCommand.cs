@@ -13,9 +13,19 @@ namespace CaseBridge_Cases.Features.Client.Command.PostCase
         [JsonIgnore]
         public string ClientName { get; set; } = string.Empty;
 
+        [Required(ErrorMessage = "Title is required.")]
+        [RegularExpression(@"^\S(.*\S)?$", ErrorMessage = "Title cannot be empty or contain leading/trailing spaces.")]
         public string Title { get; set; } = string.Empty;
+        
+        [Required(ErrorMessage = "Description is required.")]
+        [RegularExpression(@"^\S(?s:.*)\S$", ErrorMessage = "Description cannot be empty or contain leading/trailing spaces.")]
         public string Description { get; set; } = string.Empty;
+        
+        [Required(ErrorMessage = "Category is required.")]
+        [RegularExpression(@"^\S(.*\S)?$", ErrorMessage = "Category cannot be empty or contain leading/trailing spaces.")]
         public string Category { get; set; } = string.Empty;
+        
+        [Range(10, 10000000, ErrorMessage = "Budget must be a realistic positive amount (minimum $10).")]
         public decimal Budget { get; set; }
     }
 

@@ -27,4 +27,8 @@
     <Folder Include="Repositories\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\CaseBridge_Contracts\CaseBridge_Contracts.csproj" />
+  </ItemGroup>
+
 </Project>
