@@ -12,6 +12,7 @@ namespace CaseBridge_Cases.Data
         public DbSet<Case> Cases { get; set; }
         public DbSet<CaseHistory> CaseHistories { get; set; }
         public DbSet<ChatMessage> ChatMessages { get; set; }
+        public DbSet<CaseDocument> CaseDocuments { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {

@@ -2,6 +2,7 @@ using MediatR;
 using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Models;
 using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations;
 
 namespace CaseBridge_Cases.Features.Client.Command.PostCase
 {

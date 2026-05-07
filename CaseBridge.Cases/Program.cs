@@ -127,7 +127,7 @@ namespace CaseBridge.Cases
 
             app.UseAuthorization();
 
-
+            app.UseStaticFiles();
             app.MapControllers();
             app.MapHub<CaseChatHub>("/case-chat-hub");
 
