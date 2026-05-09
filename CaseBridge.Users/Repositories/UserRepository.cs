@@ -102,16 +102,16 @@ namespace CaseBridge_Users.Repositories
         public async Task<(User?, UserSecurity?)> GetUserWithSecurityAsync(string email)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"SELECT u.*, s.UserId, s.PasswordHash, s.IsEmailVerified, s.VerificationToken, s.FailedLoginAttempts, s.LockoutEnd, s.RefreshToken, s.RefreshTokenExpiryTime
-                        FROM Users u 
-                        JOIN UserSecurity s ON u.Id = s.UserId 
-                        WHERE u.Email = @Email";
+                var sql = @"SELECT u.*, s.UserId, s.* 
+                FROM Users u 
+                JOIN UserSecurity s ON u.Id = s.UserId 
+                WHERE u.Email = @Email";
 
             var result = await connection.QueryAsync<User, UserSecurity, (User, UserSecurity)>(
                 sql,
                 (user, security) => (user, security),
                 new { Email = email },
-                splitOn: "UserId"
+                splitOn: "Id"
             );
 
             return result.FirstOrDefault();

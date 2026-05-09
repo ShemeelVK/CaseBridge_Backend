@@ -4,6 +4,7 @@
     {
         Open=1,
         InReview=2,
-        Closed=3
+        Closed=3,
+        Reopened=4
     }
 }

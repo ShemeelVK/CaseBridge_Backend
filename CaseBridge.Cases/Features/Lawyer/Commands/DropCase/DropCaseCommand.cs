@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Models;
@@ -36,6 +36,7 @@ namespace CaseBridge_Cases.Features.Lawyer.Commands.DropCase
             if (caseToDrop.Status == CaseStatus.Open)
                 throw new Exception("This case is already open in the marketplace.");
 
+            caseToDrop.PreviousLawyerId = caseToDrop.AcceptedByUserId; // Safe-keep the true owner
             caseToDrop.Status = CaseStatus.Open;
             caseToDrop.AssignedFirmId = null;
             caseToDrop.AcceptedByUserId = null;

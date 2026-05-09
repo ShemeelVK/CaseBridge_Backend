@@ -7,6 +7,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using CaseBridge_Cases.Features.Chat.Hubs;
 using System.Text;
+using MassTransit;
 
 namespace CaseBridge.Cases
 {
@@ -106,10 +107,24 @@ namespace CaseBridge.Cases
                     }
                 });
              });
+            
 
             builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
             builder.Services.AddProblemDetails();
             builder.Services.AddSignalR();
+            //Mass transit configuration
+            builder.Services.AddMassTransit(x =>
+            {
+                x.UsingRabbitMq((context, cfg) =>
+                {
+                    cfg.Host("localhost", "/", h => {
+                        h.Username("guest");
+                        h.Password("guest");
+                    });
+
+                    cfg.ConfigureEndpoints(context);
+                });
+            });
 
             var app = builder.Build();
 

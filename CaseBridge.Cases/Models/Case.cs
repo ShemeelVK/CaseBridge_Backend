@@ -12,6 +12,7 @@ namespace CaseBridge_Cases.Models
         public CaseStatus Status { get; set; } = CaseStatus.Open;
         public int? AssignedFirmId { get; set; }
         public int? AcceptedByUserId{ get; set; }
+        public int? PreviousLawyerId { get; set; }
         public string LawyerName { get; set; } = string.Empty;
         public DateTime? CreatedAt { get; set; }
         public int LastModifiedByUserId { get; set; }

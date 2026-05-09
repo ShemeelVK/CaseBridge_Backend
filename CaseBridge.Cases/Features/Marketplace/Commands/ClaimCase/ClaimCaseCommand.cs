@@ -31,10 +31,25 @@ namespace CaseBridge_Cases.Features.Marketplace.Commands.ClaimCase
                 throw new Exception("Case not found");
             }
 
-            if (CaseToClaim.Status != CaseStatus.Open)
-                throw new Exception("This case is no longer available.");
+            bool isBrandNewClaim = CaseToClaim.Status == CaseStatus.Open;
+            bool isReturningLawyer = CaseToClaim.Status == CaseStatus.Closed && CaseToClaim.AcceptedByUserId == request.LawyerId;
+            bool isPreviousOwner = CaseToClaim.PreviousLawyerId == request.LawyerId;
 
-            CaseToClaim.Status = CaseStatus.InReview;
+            // If it's not open AND it's not a returning lawyer reopening their own case... block them!
+            if (!isBrandNewClaim && !isReturningLawyer)
+            {
+                throw new Exception("This case is no longer available or is locked by another lawyer.");
+            }
+
+            if (isReturningLawyer || isPreviousOwner)
+            {
+                CaseToClaim.Status = CaseStatus.Reopened;
+            }
+            else
+            {
+                CaseToClaim.Status = CaseStatus.InReview;
+            }
+
             CaseToClaim.AcceptedByUserId = request.LawyerId;
             CaseToClaim.AssignedFirmId = request.FirmId;
             CaseToClaim.LawyerName = request.LawyerName; // Save lawyer name

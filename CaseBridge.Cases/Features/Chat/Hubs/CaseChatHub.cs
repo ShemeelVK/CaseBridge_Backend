@@ -88,7 +88,7 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
             int userId = int.Parse(userIdStr);
             string roomName;
 
-            if (caseId == 0 && firmId==null)
+            if (caseId == 0)
             {
                 if (targetUserId.HasValue)
                 {

@@ -257,9 +257,9 @@ namespace CaseBridge_Users.Controllers
         }
 
         [HttpPost("forgot-password")]
-        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
+        public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest dto)
         {
-            var (user, security) = await _userRepository.GetUserWithSecurityAsync(request.Email);
+            var (user, security) = await _userRepository.GetUserWithSecurityAsync(dto.Email);
             if (user == null || security == null) return Ok("If an account exists, a link has been sent.");
 
             var resetToken = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));

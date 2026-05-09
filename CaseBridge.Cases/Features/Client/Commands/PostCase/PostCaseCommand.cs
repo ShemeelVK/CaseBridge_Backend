@@ -1,8 +1,11 @@
-using MediatR;
 using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Models;
+using CaseBridge_Contracts;
+using MassTransit;
+using MassTransit.Transports;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
-using System.ComponentModel.DataAnnotations;
 
 namespace CaseBridge_Cases.Features.Client.Command.PostCase
 {
@@ -14,28 +17,22 @@ namespace CaseBridge_Cases.Features.Client.Command.PostCase
         [JsonIgnore]
         public string ClientName { get; set; } = string.Empty;
 
-        [Required(ErrorMessage = "Title is required.")]
-        [RegularExpression(@"^\S(.*\S)?$", ErrorMessage = "Title cannot be empty or contain leading/trailing spaces.")]
         public string Title { get; set; } = string.Empty;
-        
-        [Required(ErrorMessage = "Description is required.")]
-        [RegularExpression(@"^\S(?s:.*)\S$", ErrorMessage = "Description cannot be empty or contain leading/trailing spaces.")]
         public string Description { get; set; } = string.Empty;
-        
-        [Required(ErrorMessage = "Category is required.")]
-        [RegularExpression(@"^\S(.*\S)?$", ErrorMessage = "Category cannot be empty or contain leading/trailing spaces.")]
         public string Category { get; set; } = string.Empty;
-        
-        [Range(10, 10000000, ErrorMessage = "Budget must be a realistic positive amount (minimum $10).")]
         public decimal Budget { get; set; }
+        public List<int>? DocumentIds { get; set; }
     }
 
     public class PostCaseHandler : IRequestHandler<PostCaseCommand, int>
     {
         private readonly CaseDbContext _context;
-        public PostCaseHandler(CaseDbContext context)
+        private readonly IPublishEndpoint _publishEndpoint;
+        public PostCaseHandler(CaseDbContext context, IPublishEndpoint publishEndpoint)
         {
             _context = context;
+            _publishEndpoint = publishEndpoint;
+
         }
 
         public async Task<int> Handle(PostCaseCommand request, CancellationToken cancellationToken)
@@ -55,6 +52,34 @@ namespace CaseBridge_Cases.Features.Client.Command.PostCase
 
             _context.Cases.Add(newCase);
             await _context.SaveChangesAsync(cancellationToken);
+
+
+            //Document Service
+            if (request.DocumentIds != null && request.DocumentIds.Any())
+            {
+                // Find the orphaned documents the user just uploaded.
+                var docs = await _context.CaseDocuments
+                    .Where(d => request.DocumentIds.Contains(d.Id)
+                             && d.CaseId == null
+                             && d.UploaderId == request.ClientId)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var doc in docs)
+                {
+                    doc.CaseId = newCase.Id;
+
+                    //  FIRE THE EVENT TO THE AI SERVICE!
+                    await _publishEndpoint.Publish(new DocumentUploadedEvent
+                    {
+                        DocumentId = doc.Id,
+                        CaseId = newCase.Id,
+                        FileUrl = doc.FileUrl
+                    }, cancellationToken);
+                }
+
+                // Save the updated CaseDocuments back to the database
+                await _context.SaveChangesAsync(cancellationToken);
+            }
 
             return newCase.Id;
         }
