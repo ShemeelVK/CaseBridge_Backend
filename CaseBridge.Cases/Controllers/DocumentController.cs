@@ -2,6 +2,8 @@
 using CaseBridge_Cases.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Minio;
+using Minio.DataModel.Args;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -15,12 +17,14 @@ namespace CaseBridge_Cases.Controllers
     public class DocumentController : ControllerBase
     {
         private readonly CaseDbContext _context;
-        private readonly IWebHostEnvironment _env;
+        private readonly IMinioClient _minioClient;
+        private readonly IConfiguration _config;
 
-        public DocumentController(CaseDbContext context, IWebHostEnvironment env)
+        public DocumentController(CaseDbContext context, IMinioClient minioClient, IConfiguration config)
         {
+            _minioClient = minioClient;
             _context = context;
-            _env = env;
+            _config = config;
         }
 
         [HttpPost("upload")]
@@ -38,48 +42,68 @@ namespace CaseBridge_Cases.Controllers
                 return Unauthorized();
             }
 
-            var uploadPath = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "uploads");
-            if (!Directory.Exists(uploadPath))
-            {
-                Directory.CreateDirectory(uploadPath);
-            }
-
             var uploadedDocs = new List<object>();
+            var bucketName = _config["MinIO:BucketName"];
+            var publicUrl = _config["MinIO:PublicUrl"];
 
-            foreach (var file in files)
+            try
             {
-                if (file.Length == 0) continue;
-
-                var uniqueFileName = $"{Guid.NewGuid()}_{file.FileName}";
-                var filePath = Path.Combine(uploadPath, uniqueFileName);
-
-                // Save the physical file to the disk
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                //SAFETY CHECK: Ensure the MinIO bucket exists before we start looping
+                bool bucketExists = await _minioClient.BucketExistsAsync(new BucketExistsArgs().WithBucket(bucketName));
+                if (!bucketExists)
                 {
-                    await file.CopyToAsync(stream);
+                    await _minioClient.MakeBucketAsync(new MakeBucketArgs().WithBucket(bucketName));
                 }
 
-                var newDoc = new CaseDocument
+                foreach (var file in files)
                 {
-                    CaseId = null, // Explicitly null! Waiting for React to submit the case.
-                    UploaderId = uploaderId,
-                    FileName = file.FileName,
-                    FileUrl = $"/uploads/{uniqueFileName}",
-                    UploadedAt = DateTime.UtcNow
-                };
+                    if (file.Length == 0) continue;
 
-                _context.CaseDocuments.Add(newDoc);
-                await _context.SaveChangesAsync();
+                    var uniqueFileName = $"{Guid.NewGuid()}_{file.FileName}";
 
-                uploadedDocs.Add(new
-                {
-                    documentId = newDoc.Id,
-                    url = newDoc.FileUrl,
-                    name = newDoc.FileName
-                });
+                    // STREAM DIRECTLY TO MINIO
+                    using (var stream = file.OpenReadStream())
+                    {
+                        await _minioClient.PutObjectAsync(new PutObjectArgs()
+                            .WithBucket(bucketName)
+                            .WithObject(uniqueFileName)
+                            .WithStreamData(stream)
+                            .WithObjectSize(stream.Length)
+                            .WithContentType(file.ContentType));
+                    }
 
-            }
+                    // GENERATE THE MINIO URL
+                    // Note: In production, this would be your Amazon S3 URL
+                    var minioUrl = $"{publicUrl}/{bucketName}/{uniqueFileName}";
+
+                    // 5. SAVE TO SQL DATABASE
+                    var newDoc = new CaseDocument
+                    {
+                        CaseId = null, // Waiting for React to submit the case!
+                        UploaderId = uploaderId,
+                        FileName = file.FileName,
+                        FileUrl = minioUrl, // We save the MinIO URL now
+                        UploadedAt = DateTime.UtcNow
+                    };
+
+                    _context.CaseDocuments.Add(newDoc);
+                    await _context.SaveChangesAsync();
+
+                    uploadedDocs.Add(new
+                    {
+                        documentId = newDoc.Id,
+                        url = newDoc.FileUrl,
+                        name = newDoc.FileName
+                    });
+                }
+
                 return Ok(uploadedDocs);
+            }
+            catch (Exception ex)
+            {
+                // If MinIO is offline, we catch it here so the API doesn't crash
+                return StatusCode(500, $"Storage Error: {ex.Message}");
+            }
         }
     }
 }

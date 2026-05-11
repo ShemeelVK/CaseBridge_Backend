@@ -1,13 +1,14 @@
 using CaseBridge_Cases.Data;
+using CaseBridge_Cases.Features.Chat.Hubs;
 using CaseBridge_Cases.Middleware;
+using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.SqlServer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using CaseBridge_Cases.Features.Chat.Hubs;
+using Minio;
 using System.Text;
-using MassTransit;
 
 namespace CaseBridge.Cases
 {
@@ -125,6 +126,19 @@ namespace CaseBridge.Cases
                     cfg.ConfigureEndpoints(context);
                 });
             });
+
+            // MiniO configuration
+            // Connect to the local Docker container
+            builder.Services.AddMinio(configureClient => configureClient
+                .WithEndpoint(builder.Configuration["MinIO:Endpoint"])
+                .WithCredentials(
+                    builder.Configuration["MinIO:AccessKey"],
+                    builder.Configuration["MinIO:SecretKey"]
+                )
+                .WithSSL(false)
+                .Build());
+
+
 
             var app = builder.Build();
 

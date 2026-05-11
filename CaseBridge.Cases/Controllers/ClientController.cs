@@ -1,15 +1,16 @@
 using CaseBridge_Cases.Data;
+using CaseBridge_Cases.DTO;
 using CaseBridge_Cases.Features.Client.Command.PostCase;
 using CaseBridge_Cases.Features.Client.Queries.GetClientCases;
+using CaseBridge_Cases.Features.Client.Queries.GetClientCasesById;
 using CaseBridge_Cases.Models;
-using CaseBridge_Cases.DTO;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 using System.Collections;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace CaseBridge_Cases.Controllers
 {
@@ -61,6 +62,34 @@ namespace CaseBridge_Cases.Controllers
             var cases = await _mediator.Send(new GetClientCases { ClientId = secureClientId });
 
             return Ok(cases);
+        }
+
+        [HttpGet("cases/{id}")]
+        public async Task<IActionResult> GetClientCaseById(int id)
+        {
+            // Extract the Client's UserID from the JWT Token
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("UserId");
+
+            if (!int.TryParse(userIdClaim, out int clientId))
+            {
+                return Unauthorized();
+            }
+
+            var query = new GetClientCasesById
+            {
+                CaseId = id,
+                ClientId = clientId
+            };
+
+            var result = await _mediator.Send(query);
+
+            if (result == null)
+            {
+                // Returns NotFound if the case doesn't exist OR doesn't belong to this client
+                return NotFound("Case not found or you do not have permission to view it.");
+            }
+
+            return Ok(result);
         }
     }
 }

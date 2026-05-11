@@ -2,6 +2,7 @@ using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Features.Lawyer.Commands.CloseCase;
 using CaseBridge_Cases.Features.Lawyer.Commands.DropCase;
 using CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCases;
+using CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCasesById;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -46,6 +47,37 @@ namespace CaseBridge_Cases.Controllers
             });
 
             return Ok(cases);
+        }
+
+        [HttpGet("cases/{id}")]
+        public async Task<IActionResult> GetFirmCaseById(int id)
+        {
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("UserId");
+            var firmIdClaim = User.FindFirstValue("SeniorId"); // Ensure your Token includes the FirmId
+
+            if (!int.TryParse(userIdClaim, out int userId) || !int.TryParse(firmIdClaim, out int firmId))
+            {
+                return Unauthorized();
+            }
+
+            bool isSenior = User.IsInRole("SeniorId") || User.IsInRole("Admin");
+
+            var query = new GetFirmCaseByIdQuery
+            {
+                CaseId = id,
+                FirmId = firmId,
+                UserId = userId,
+                IsSenior = isSenior
+            };
+
+            var result = await _mediator.Send(query);
+
+            if (result == null)
+            {
+                return NotFound("Case not found or not assigned to your firm/account.");
+            }
+
+            return Ok(result);
         }
 
         [HttpPut("cases/{id}/close-case")]
