@@ -1,4 +1,4 @@
-﻿using CaseBridge_Cases.Data;
+using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Models;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+
 namespace CaseBridge_Cases.Controllers
 {
     [ApiController]
@@ -35,7 +36,7 @@ namespace CaseBridge_Cases.Controllers
                 return BadRequest();
             }
 
-            var userIdClaim=User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("UserId");
+            var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("UserId");
 
             if (!int.TryParse(userIdClaim, out int uploaderId))
             {
@@ -48,7 +49,6 @@ namespace CaseBridge_Cases.Controllers
 
             try
             {
-                //SAFETY CHECK: Ensure the MinIO bucket exists before we start looping
                 bool bucketExists = await _minioClient.BucketExistsAsync(new BucketExistsArgs().WithBucket(bucketName));
                 if (!bucketExists)
                 {
@@ -61,7 +61,6 @@ namespace CaseBridge_Cases.Controllers
 
                     var uniqueFileName = $"{Guid.NewGuid()}_{file.FileName}";
 
-                    // STREAM DIRECTLY TO MINIO
                     using (var stream = file.OpenReadStream())
                     {
                         await _minioClient.PutObjectAsync(new PutObjectArgs()
@@ -72,17 +71,14 @@ namespace CaseBridge_Cases.Controllers
                             .WithContentType(file.ContentType));
                     }
 
-                    // GENERATE THE MINIO URL
-                    // Note: In production, this would be your Amazon S3 URL
                     var minioUrl = $"{publicUrl}/{bucketName}/{uniqueFileName}";
 
-                    // 5. SAVE TO SQL DATABASE
                     var newDoc = new CaseDocument
                     {
-                        CaseId = null, // Waiting for React to submit the case!
+                        CaseId = null,
                         UploaderId = uploaderId,
                         FileName = file.FileName,
-                        FileUrl = minioUrl, // We save the MinIO URL now
+                        FileUrl = minioUrl,
                         UploadedAt = DateTime.UtcNow
                     };
 
@@ -101,7 +97,6 @@ namespace CaseBridge_Cases.Controllers
             }
             catch (Exception ex)
             {
-                // If MinIO is offline, we catch it here so the API doesn't crash
                 return StatusCode(500, $"Storage Error: {ex.Message}");
             }
         }

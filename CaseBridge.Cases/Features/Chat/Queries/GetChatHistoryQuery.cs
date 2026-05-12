@@ -11,7 +11,7 @@ namespace CaseBridge_Cases.Features.Chat.Queries
         public string RoomType { get; set; } = string.Empty;
         public int? TargetUserId { get; set; }
         public int? CurrentUserId { get; set; }
-        public int? FirmId { get; set; }  // Used to scope messages to the current firm
+        public int? FirmId { get; set; }
     }
 
     public class GetChatHistoryHandler : IRequestHandler<GetChatHistoryQuery, IEnumerable<ChatMessageDTO>>
@@ -26,22 +26,18 @@ namespace CaseBridge_Cases.Features.Chat.Queries
         public async Task<IEnumerable<ChatMessageDTO>> Handle(GetChatHistoryQuery request, CancellationToken cancellationToken)
         {
             using var connection = _context.GetConnection();
-            
+
             string sql;
             object parameters;
 
-            // THE UNIVERSAL QUERY FIX:
-            // Whether it's a Client, a Junior, or a Senior... you only ever see messages 
-            // where your exact User ID was the Sender or the Receiver.
-            // This perfectly maintains Client Continuity and Ethical Walls.
             if (request.CaseId == 0 && request.TargetUserId.HasValue && request.CurrentUserId.HasValue)
             {
-                // 1-on-1 DM Logic (Internal Firm Room)
+                // 1-on-1 DM
                 sql = @"
-                    SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId 
-                    FROM ChatMessages 
+                    SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId
+                    FROM ChatMessages
                     WHERE CaseId = 0 AND RoomType = @RoomType AND (
-                        (SenderId = @UserId AND ReceiverId = @TargetId) OR 
+                        (SenderId = @UserId AND ReceiverId = @TargetId) OR
                         (SenderId = @TargetId AND ReceiverId = @UserId)
                     )
                     ORDER BY SendAt ASC";
@@ -49,33 +45,52 @@ namespace CaseBridge_Cases.Features.Chat.Queries
             }
             else if (!request.TargetUserId.HasValue && request.RoomType.Equals("internal", StringComparison.OrdinalIgnoreCase) && request.FirmId.HasValue)
             {
-                // Firm Group Chat Logic (Firm General Room OR Internal Case Room)
+                // Firm group chat
                 sql = @"
-                    SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId 
-                    FROM ChatMessages 
+                    SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId
+                    FROM ChatMessages
                     WHERE CaseId = @CaseId AND RoomType = @RoomType AND FirmId = @FirmId
                     ORDER BY SendAt ASC";
                 parameters = new { CaseId = request.CaseId, RoomType = request.RoomType, FirmId = request.FirmId.Value };
             }
             else
             {
-                // Universal External Chat Logic
+                // Universal external chat
                 sql = @"
-                    SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId 
-                    FROM ChatMessages 
-                    WHERE CaseId = @CaseId AND RoomType = @RoomType 
+                    SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId
+                    FROM ChatMessages
+                    WHERE CaseId = @CaseId AND RoomType = @RoomType
                     AND (SenderId = @CurrentUserId OR ReceiverId = @CurrentUserId)
                     ORDER BY SendAt ASC";
-
-                parameters = new
-                {
-                    CaseId = request.CaseId,
-                    RoomType = request.RoomType,
-                    CurrentUserId = request.CurrentUserId.Value
-                };
+                parameters = new { CaseId = request.CaseId, RoomType = request.RoomType, CurrentUserId = request.CurrentUserId!.Value };
             }
 
-            return await connection.QueryAsync<ChatMessageDTO>(sql, parameters);
+            var messages = (await connection.QueryAsync<ChatMessageDTO>(sql, parameters)).ToList();
+
+            // Second pass: fetch all attachments for these messages in one query
+            if (messages.Count > 0)
+            {
+                var messageIds = messages.Select(m => m.Id).ToList();
+
+                const string attachmentSql = @"
+                    SELECT ChatMessageId, FileUrl, FileName
+                    FROM CaseDocuments
+                    WHERE ChatMessageId IN @Ids";
+
+                var attachments = await connection.QueryAsync<ChatAttachmentDTO>(attachmentSql, new { Ids = messageIds });
+
+                // Group by message and assign
+                var grouped = attachments.GroupBy(a => a.ChatMessageId)
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                foreach (var msg in messages)
+                {
+                    if (grouped.TryGetValue(msg.Id, out var docs))
+                        msg.Attachments = docs;
+                }
+            }
+
+            return messages;
         }
     }
 }
