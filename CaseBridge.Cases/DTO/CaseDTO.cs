@@ -15,6 +15,7 @@ namespace CaseBridge_Cases.DTO
         public int? AssignedFirmId { get; set; }
         public int? AcceptedByUserid { get; set; }
         public string LawyerName { get; set; } = string.Empty;
+        public string? AiSummary { get; set; }
         public DateTime? CreatedAt { get; set; }
         public int LastModifiedByUserId { get; set; }
     }

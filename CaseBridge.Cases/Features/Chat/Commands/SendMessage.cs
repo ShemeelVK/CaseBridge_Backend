@@ -4,7 +4,19 @@ using CaseBridge_Cases.Data;
 
 namespace CaseBridge_Cases.Features.Chat.Commands
 {
-    public class SendMessage : IRequest<int>
+    public class SendMessageResult
+    {
+        public int MessageId { get; set; }
+        public List<AttachmentResult> Attachments { get; set; } = new();
+    }
+
+    public class AttachmentResult
+    {
+        public string FileUrl { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+    }
+
+    public class SendMessage : IRequest<SendMessageResult>
     {
         public int CaseId { get; set; }
         public int SenderId { get; set; }
@@ -18,7 +30,7 @@ namespace CaseBridge_Cases.Features.Chat.Commands
         public List<int>? AttachmentDocIds { get; set; }
     }
 
-    public class SendMessageCommandHandler : IRequestHandler<SendMessage, int>
+    public class SendMessageCommandHandler : IRequestHandler<SendMessage, SendMessageResult>
     {
         private readonly CaseDbContext _context;
 
@@ -27,7 +39,7 @@ namespace CaseBridge_Cases.Features.Chat.Commands
             _context = context;
         }
 
-        public async Task<int> Handle(SendMessage request, CancellationToken cancellationToken)
+        public async Task<SendMessageResult> Handle(SendMessage request, CancellationToken cancellationToken)
         {
             if (request.CaseId > 0 && request.RoomType.Equals("external", StringComparison.OrdinalIgnoreCase))
             {
@@ -64,7 +76,9 @@ namespace CaseBridge_Cases.Features.Chat.Commands
             _context.ChatMessages.Add(chatMessage);
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Link each pre-uploaded document to this chat message
+            var resolvedAttachments = new List<AttachmentResult>();
+
+            // Link each pre-uploaded document to this chat message and collect their URLs
             if (request.AttachmentDocIds is { Count: > 0 })
             {
                 var docs = _context.CaseDocuments
@@ -75,12 +89,13 @@ namespace CaseBridge_Cases.Features.Chat.Commands
                 {
                     doc.ChatMessageId = chatMessage.Id;
                     if (doc.CaseId == null) doc.CaseId = request.CaseId > 0 ? request.CaseId : null;
+                    resolvedAttachments.Add(new AttachmentResult { FileUrl = doc.FileUrl, FileName = doc.FileName });
                 }
 
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
-            return chatMessage.Id;
+            return new SendMessageResult { MessageId = chatMessage.Id, Attachments = resolvedAttachments };
         }
     }
 }

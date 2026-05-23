@@ -101,7 +101,7 @@ namespace CaseBridge_Users.Repositories
         // 3. GET BOTH (For Login)
         public async Task<(User?, UserSecurity?)> GetUserWithSecurityAsync(string email)
         {
-            using var connection = _context.CreateConnection();
+             using var connection = _context.CreateConnection();
                 var sql = @"SELECT u.*, s.UserId, s.* 
                 FROM Users u 
                 JOIN UserSecurity s ON u.Id = s.UserId 
@@ -260,6 +260,21 @@ namespace CaseBridge_Users.Repositories
 
             return await connection.QueryFirstOrDefaultAsync(sql, new { JuniorId = juniorId });
         }
+        public async Task<bool> RemoveJuniorAssociateAsync(int seniorId, int juniorId)
+        {
+            var query = @"
+                UPDATE LawyerProfiles 
+                SET SeniorLawyerId = NULL 
+                WHERE UserId = @JuniorId AND SeniorLawyerId = @SeniorId;
+            ";
 
+            using var connection = _context.CreateConnection();
+            
+            // ExecuteAsync returns the number of rows affected.
+            var rowsAffected = await connection.ExecuteAsync(query, new { SeniorId = seniorId, JuniorId = juniorId });
+
+            // If rowsAffected > 0, it means it successfully found and removed the junior
+            return rowsAffected > 0;
+        }
     }
 }

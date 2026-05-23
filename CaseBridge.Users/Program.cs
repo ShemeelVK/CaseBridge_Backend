@@ -3,6 +3,7 @@ using CaseBridge_Users.Services;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Microsoft.OpenApi.Models;
+using MassTransit;
 
 namespace CaseBridge.Users
 {
@@ -24,6 +25,21 @@ namespace CaseBridge.Users
             builder.Services.AddScoped<CaseBridge_Users.Repositories.UserRepository>();
             builder.Services.AddScoped<TokenService>();
             builder.Services.AddTransient<EmailService>();
+
+            // MassTransit (RabbitMQ) Configuration
+            builder.Services.AddMassTransit(x =>
+            {
+                x.UsingRabbitMq((context, cfg) =>
+                {
+                    cfg.Host(builder.Configuration["RabbitMQ:Host"], "/", h =>
+                    {
+                        h.Username(builder.Configuration["RabbitMQ:Username"]);
+                        h.Password(builder.Configuration["RabbitMQ:Password"]);
+                    });
+
+                    cfg.ConfigureEndpoints(context);
+                });
+            });
 
             // Configure CORS
             builder.Services.AddCors(options =>

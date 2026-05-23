@@ -8,6 +8,8 @@ using CaseBridge_Users.Services;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using CaseBridge_Users.DTOs.Firm;
+using MassTransit;
+using CaseBridge_Contracts;
 
 namespace CaseBridge_Users.Controllers
 {
@@ -18,10 +20,13 @@ namespace CaseBridge_Users.Controllers
     {
         private readonly UserRepository _userRepository;
         private readonly EmailService _emailService;
-        public SeniorController(UserRepository userRepository, EmailService emailService)
+        private readonly IPublishEndpoint _publishEndpoint;
+        
+        public SeniorController(UserRepository userRepository, EmailService emailService, IPublishEndpoint publishEndpoint)
         {
             _userRepository = userRepository;
             _emailService = emailService;
+            _publishEndpoint = publishEndpoint;
         }
 
         [HttpPost("add-junior")]
@@ -112,6 +117,40 @@ namespace CaseBridge_Users.Controllers
             return Ok(new { Message = "Firm bio updated successfully." });
         }   
 
+        [HttpDelete("remove-junior/{juniorId}")]
+        public async Task<IActionResult> RemoveJuniorAssociate(int juniorId)
+        {
+            // 1. Extract the Senior Lawyer's ID from the token (using existing logic)
+            var userIdClaim = User.FindFirst("UserId") ?? User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim == null || !int.TryParse(userIdClaim.Value, out int callerId))
+            {
+                return Unauthorized("Invalid Token Data");
+            }
 
+            // 2. Security Check: The caller MUST be a Senior Lawyer (Firm Owner)
+            var (callerUser, callerProfile) = await _userRepository.GetUserAndProfileAsync(callerId);
+            
+            if (callerUser?.UserType != "Lawyer" || callerProfile?.SeniorLawyerId != null)
+            {
+                return StatusCode(403, "Only Firm Owners (Senior Advocates) can remove Junior Associates.");
+            }
+
+            // 3. Attempt to remove the junior using the repository
+            var success = await _userRepository.RemoveJuniorAssociateAsync(callerId, juniorId);
+
+            if (!success)
+            {
+                return BadRequest("Failed to remove junior. They might not belong to your firm, or they don't exist.");
+            }
+
+            // 4. Publish the event so Cases service can reassign active cases
+            await _publishEndpoint.Publish(new JuniorRemovedFromFirmEvent
+            {
+                SeniorId = callerId,
+                JuniorId = juniorId
+            });
+
+            return Ok(new { Message = "Junior Associate successfully removed from your firm." });
+        }
     }
 }

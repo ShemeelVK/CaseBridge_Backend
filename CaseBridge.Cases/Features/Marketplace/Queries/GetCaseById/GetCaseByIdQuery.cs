@@ -35,6 +35,7 @@ namespace CaseBridge_Cases.Features.Marketplace.Queries.GetCaseById
                     AssignedFirmId, 
                     AcceptedByUserId, 
                     LawyerName,
+                    AiSummary,
                     CreatedAt, 
                     LastModifiedByUserId 
                 FROM Cases 

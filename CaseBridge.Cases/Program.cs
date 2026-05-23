@@ -116,6 +116,9 @@ namespace CaseBridge.Cases
             //Mass transit configuration
             builder.Services.AddMassTransit(x =>
             {
+                x.AddConsumer<CaseBridge_Cases.Consumers.CaseSummaryGeneratedConsumer>();
+                x.AddConsumer<CaseBridge_Cases.Consumers.JuniorRemovedFromFirmConsumer>();
+
                 x.UsingRabbitMq((context, cfg) =>
                 {
                     cfg.Host("localhost", "/", h => {

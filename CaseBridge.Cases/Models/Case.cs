@@ -14,6 +14,7 @@ namespace CaseBridge_Cases.Models
         public int? AcceptedByUserId{ get; set; }
         public int? PreviousLawyerId { get; set; }
         public string LawyerName { get; set; } = string.Empty;
+        public string? AiSummary { get; set; } // Stores the AI generated case summary
         public DateTime? CreatedAt { get; set; }
         public int LastModifiedByUserId { get; set; }
 

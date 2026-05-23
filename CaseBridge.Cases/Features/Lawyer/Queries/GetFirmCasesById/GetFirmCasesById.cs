@@ -1,4 +1,4 @@
-﻿using CaseBridge_Cases.DTO;
+using CaseBridge_Cases.DTO;
 using CaseBridge_Cases.Models;
 using CaseBridge_Cases.Data;
 using MediatR;
@@ -27,7 +27,7 @@ namespace CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCasesById
                         SELECT 
                             Id, ClientId, ClientName, Title, Description, 
                             Status, AssignedFirmId, AcceptedByUserId, CreatedAt, 
-                            Category, LastModifiedByUserId, Budget, LawyerName
+                            Category, LastModifiedByUserId, Budget, LawyerName, AiSummary
                         FROM Cases 
                         WHERE Id = @CaseId AND AssignedFirmId = @FirmId";
 

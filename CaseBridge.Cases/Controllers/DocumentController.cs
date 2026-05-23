@@ -73,7 +73,7 @@ namespace CaseBridge_Cases.Controllers
 
                     var minioUrl = $"{publicUrl}/{bucketName}/{uniqueFileName}";
 
-                    var newDoc = new CaseDocument
+                        var newDoc = new CaseDocument
                     {
                         CaseId = null,
                         UploaderId = uploaderId,

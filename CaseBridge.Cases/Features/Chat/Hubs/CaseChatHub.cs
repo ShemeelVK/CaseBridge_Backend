@@ -30,25 +30,32 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
             }
 
             int userId = int.Parse(userIdStr);
-            int? firmId = string.IsNullOrEmpty(firmIdStr) ? null : int.Parse(firmIdStr);
+            int? firmId=string.IsNullOrEmpty(firmIdStr) ? null : int.Parse(firmIdStr);
             string roomName;
 
             if (caseId == 0)
             {
                 if (targetUserId.HasValue)
                 {
+                    // 1-on-1 DM: Use a unique room name for these two users
                     int id1 = Math.Min(userId, targetUserId.Value);
                     int id2 = Math.Max(userId, targetUserId.Value);
                     roomName = $"DM-{id1}-{id2}";
                 }
                 else
                 {
-                    if (firmId == null) { Context.Abort(); return; }
+                    if(firmId==null)
+                    {
+                        Context.Abort();
+                        return;
+                    }
+                    // Firm-wide general chat
                     roomName = $"FirmRoom-{firmId}";
                 }
             }
             else
             {
+                // Case-specific chat
                 roomName = $"CaseRoom-{caseId}-{roomType}";
 
                 var hasAccess = await _mediator.Send(new ValidateChatAccessQuery
@@ -70,18 +77,18 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
             await Groups.AddToGroupAsync(Context.ConnectionId, roomName);
         }
 
-        public async Task SendMessage(int caseId, string roomType, string message, int? targetUserId = null, int? parentMessageId = null, int[]? attachmentDocIds = null)
+        public async Task SendMessage(int caseId, string roomType, string message, int? targetUserId = null, int? parentMessageId = null, List<int>? attachmentDocIds = null)
         {
             var userIdStr = Context.User?.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? Context.User?.FindFirst("UserId")?.Value;
             var userName = Context.User?.FindFirst(ClaimTypes.Name)?.Value ?? Context.User?.FindFirst("name")?.Value ?? "Unknown User";
-            var firmIdStr = Context.User?.FindFirst("SeniorId")?.Value;
+            var firmId = Context.User?.FindFirst("SeniorId")?.Value;
 
             if (userIdStr == null || string.IsNullOrEmpty(userName)) return;
 
             int userId = int.Parse(userIdStr);
             string roomName;
 
-            if (caseId == 0)
+            if (caseId == 0 && firmId==null)
             {
                 if (targetUserId.HasValue)
                 {
@@ -91,8 +98,12 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
                 }
                 else
                 {
-                    if (string.IsNullOrEmpty(firmIdStr)) { Context.Abort(); return; }
-                    roomName = $"FirmRoom-{firmIdStr}";
+                    if(firmId==null)
+                    {
+                        Context.Abort();
+                        return;
+                    }
+                    roomName = $"FirmRoom-{firmId}";
                 }
             }
             else
@@ -106,39 +117,25 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
                 SenderId = userId,
                 SenderName = userName,
                 ReceiverId = targetUserId,
-                FirmId = string.IsNullOrEmpty(firmIdStr) ? null : int.Parse(firmIdStr),
+                FirmId = string.IsNullOrEmpty(firmId) ? null : int.Parse(firmId),
                 RoomType = roomType,
                 MessageText = message,
                 ParentMessageId = parentMessageId,
-                AttachmentDocIds = attachmentDocIds?.ToList()
+                AttachmentDocIds = attachmentDocIds
             };
 
-            var messageId = await _mediator.Send(command);
-
-            // Resolve attachment info for real-time broadcast using a scoped context
-            var attachments = new List<object>();
-            if (attachmentDocIds is { Length: > 0 })
-            {
-                using var scope = Context.GetHttpContext()!.RequestServices.CreateScope();
-                var db = scope.ServiceProvider.GetRequiredService<Data.CaseDbContext>();
-                var docs = db.CaseDocuments
-                    .Where(d => attachmentDocIds.Contains(d.Id))
-                    .Select(d => new { fileUrl = d.FileUrl, fileName = d.FileName })
-                    .ToList();
-
-                attachments.AddRange(docs);
-            }
+            var result = await _mediator.Send(command);
 
             await Clients.Group(roomName).SendAsync("ReceiveMessage", new
             {
-                id = messageId,
+                id = result.MessageId,
                 caseId = caseId,
                 senderId = userId,
                 senderName = userName,
                 text = message,
                 parentMessageId = parentMessageId,
-                attachments = attachments,
-                timestamp = DateTime.UtcNow
+                timestamp = DateTime.UtcNow,
+                attachments = result.Attachments.Select(a => new { fileUrl = a.FileUrl, fileName = a.FileName }).ToList()
             });
         }
     }
