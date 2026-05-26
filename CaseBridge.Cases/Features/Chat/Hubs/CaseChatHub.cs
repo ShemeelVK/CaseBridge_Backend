@@ -234,5 +234,17 @@ namespace CaseBridge_Cases.Features.Chat.Hubs
         {
             await Clients.Group($"user-{targetUserId}").SendAsync("CallEnded", new { roomName });
         }
+
+        // Sent when the receiver is already on another call — gives caller a "busy" signal
+        public async Task BusyReject(string roomName, int callerId)
+        {
+            await Clients.Group($"user-{callerId}").SendAsync("CallBusy", new { roomName });
+        }
+
+        // Tells the held person they've been put on / resumed from hold
+        public async Task NotifyHold(string roomName, int targetUserId, bool isOnHold)
+        {
+            await Clients.Group($"user-{targetUserId}").SendAsync("CallHoldChanged", new { roomName, isOnHold });
+        }
     }
 }
