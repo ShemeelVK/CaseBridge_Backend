@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CaseBridge.AI\CaseBridge_AI.csproj" />
     <ProjectReference Include="..\CaseBridge_Contracts\CaseBridge_Contracts.csproj" />
   </ItemGroup>
 

@@ -21,116 +21,97 @@ namespace CaseBridge_Users.Repositories
 
         public async Task<bool> RegisterLawyerAsync(User user, LawyerProfile profile, string password, string verificationToken)
         {
-            var PasswordHash = BCrypt.Net.BCrypt.HashPassword(password);
+            var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
 
             using var connection = _context.CreateConnection();
-            connection.Open();
-            using var transaction = connection.BeginTransaction();
-
             try
             {
-                var userSql = @"INSERT INTO Users (Email, FullName, UserType) 
-                              VALUES (@Email, @FullName, @UserType);
-                              SELECT CAST(SCOPE_IDENTITY() as int);";
-                user.Id = await connection.ExecuteScalarAsync<int>(userSql, user, transaction);
-
-                var securitySql = @"INSERT INTO UserSecurity (UserId, PasswordHash, IsEmailVerified, VerificationToken, FailedLoginAttempts) 
-                                    VALUES (@UserId, @Hash, 0, @Token, 0)";
-
-                await connection.ExecuteAsync(securitySql, new
+                var parameters = new
                 {
-                    UserId = user.Id,
-                    Hash = PasswordHash,
-                    Token = verificationToken
-                }, transaction);
+                    Email = user.Email,
+                    FullName = user.FullName,
+                    UserType = user.UserType,
+                    PasswordHash = passwordHash,
+                    VerificationToken = verificationToken,
+                    EnrollmentNumber = profile.EnrollmentNumber,
+                    Specialization = profile.Specialization,
+                    SeniorLawyerId = profile.SeniorLawyerId,
+                    FirmBio = profile.FirmBio
+                };
 
-                var profileSql = @"INSERT INTO LawyerProfiles (UserId, EnrollmentNumber, Specialization, SeniorLawyerId, FirmBio, IsVerified) 
-                                   VALUES (@UserId, @EnrollmentNumber, @Specialization, @SeniorLawyerId, @FirmBio, 0)";
-
+                user.Id = await connection.ExecuteScalarAsync<int>(
+                    "sp_RegisterLawyer",
+                    parameters,
+                    commandType: CommandType.StoredProcedure
+                );
+                
                 profile.UserId = user.Id;
-                await connection.ExecuteAsync(profileSql, profile, transaction);
-
-                transaction.Commit();
                 return true;
             }
             catch (Exception ex)
             {
-                transaction.Rollback();
-                Console.WriteLine($"DB ERROR: {ex.Message}"); // See if there is a hidden SQL error
+                Console.WriteLine($"DB ERROR: {ex.Message}");
                 throw;
             }
         }
+
         public async Task<bool> RegisterClientAsync(User user, ClientProfile profile, string password, string verificationToken)
         {
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(password);
 
             using var connection = _context.CreateConnection();
-            connection.Open();
-            using var transaction = connection.BeginTransaction();
-
             try
             {
-                // Insert into Users
-                var userSql = @"INSERT INTO Users (Email, FullName, UserType) 
-                        VALUES (@Email, @FullName, 'Client');
-                        SELECT CAST(SCOPE_IDENTITY() as int);";
-                user.Id = await connection.ExecuteScalarAsync<int>(userSql, user, transaction);
+                var parameters = new
+                {
+                    Email = user.Email,
+                    FullName = user.FullName,
+                    PasswordHash = passwordHash,
+                    VerificationToken = verificationToken,
+                    PhoneNumber = profile.PhoneNumber,
+                    Address = profile.Address,
+                    ClientType = profile.ClientType
+                };
 
-                // Insert into UserSecurity
-                var securitySql = @"INSERT INTO UserSecurity (UserId, PasswordHash, IsEmailVerified, VerificationToken, FailedLoginAttempts) 
-                            VALUES (@UserId, @Hash, 0, @Token, 0)";
-                await connection.ExecuteAsync(securitySql, new { UserId = user.Id, Hash = passwordHash, Token = verificationToken }, transaction);
+                user.Id = await connection.ExecuteScalarAsync<int>(
+                    "sp_RegisterClient",
+                    parameters,
+                    commandType: CommandType.StoredProcedure
+                );
 
-                // Insert into ClientProfiles
-                var profileSql = @"INSERT INTO ClientProfiles (UserId, PhoneNumber, Address, ClientType) 
-                           VALUES (@UserId, @PhoneNumber, @Address, @ClientType)";
                 profile.UserId = user.Id;
-                await connection.ExecuteAsync(profileSql, profile, transaction);
-
-                transaction.Commit();
                 return true;
             }
             catch (Exception ex)
             {
-                transaction.Rollback();
                 Console.WriteLine($"DB Error: {ex.Message}");
                 return false;
             }
         }
 
-        // 3. GET BOTH (For Login)
         public async Task<(User?, UserSecurity?)> GetUserWithSecurityAsync(string email)
         {
-             using var connection = _context.CreateConnection();
-                var sql = @"SELECT u.*, s.UserId, s.* 
-                FROM Users u 
-                JOIN UserSecurity s ON u.Id = s.UserId 
-                WHERE u.Email = @Email";
-
+            using var connection = _context.CreateConnection();
             var result = await connection.QueryAsync<User, UserSecurity, (User, UserSecurity)>(
-                sql,
+                "sp_GetUserWithSecurity",
                 (user, security) => (user, security),
                 new { Email = email },
-                splitOn: "Id"
+                splitOn: "UserId",
+                commandType: CommandType.StoredProcedure
             );
 
             return result.FirstOrDefault();
         }
 
-        // Fetch User and Profile together(needed for Senior verification)
         public async Task<(User?, LawyerProfile?)> GetUserAndProfileAsync(int userId)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"SELECT u.*, p.UserId, p.SeniorLawyerId, p.EnrollmentNumber, p.Specialization, p.FirmBio, p.IsVerified 
-                        FROM Users u 
-                        LEFT JOIN LawyerProfiles p ON u.Id = p.UserId 
-                        WHERE u.Id = @UserId";
-
             var result = await connection.QueryAsync<User, LawyerProfile, (User, LawyerProfile)>(
-                sql,
+                "sp_GetUserAndProfile",
                 (u, p) => (u, p),
                 new { UserId = userId },
-                splitOn: "UserId"
+                splitOn: "UserId",
+                commandType: CommandType.StoredProcedure
             );
 
             return result.FirstOrDefault();
@@ -139,141 +120,128 @@ namespace CaseBridge_Users.Repositories
         public async Task UpdateRefreshTokenAsync(int userId, string token, DateTime expiry)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"UPDATE UserSecurity 
-                        SET RefreshToken = @Token, 
-                            RefreshTokenExpiryTime = @Expiry 
-                        WHERE UserId = @UserId";
-
-            await connection.ExecuteAsync(sql, new { UserId = userId, Token = token, Expiry = expiry });
+            await connection.ExecuteAsync(
+                "sp_UpdateRefreshToken",
+                new { UserId = userId, Token = token, Expiry = expiry },
+                commandType: CommandType.StoredProcedure
+            );
         }
 
         public async Task<(User?, UserSecurity?)> GetUserByRefreshTokenAsync(string refreshToken)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"SELECT u.*, s.* FROM Users u 
-                        JOIN UserSecurity s ON u.Id = s.UserId 
-                        WHERE s.RefreshToken = @RefreshToken";
-
             var result = await connection.QueryAsync<User, UserSecurity, (User, UserSecurity)>(
-                sql,
+                "sp_GetUserByRefreshToken",
                 (user, security) => (user, security),
                 new { RefreshToken = refreshToken },
-                splitOn: "UserId"
+                splitOn: "UserId",
+                commandType: CommandType.StoredProcedure
             );
 
             return result.FirstOrDefault();
         }
 
-        //Bulk Security Update (For Forgot Password/Verification)
         public async Task UpdateSecurityStatusAsync(UserSecurity security)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"UPDATE UserSecurity 
-                SET IsEmailVerified = @IsEmailVerified, 
-                    VerificationToken = @VerificationToken,
-                    PasswordHash = @PasswordHash,
-                    PasswordResetToken = @PasswordResetToken, 
-                    ResetTokenExpiry = @ResetTokenExpiry,
-                    FailedLoginAttempts = @FailedLoginAttempts, 
-                    LockoutEnd = @LockoutEnd,
-                    IsLocked = @IsLocked
-                WHERE UserId = @UserId";
-            await connection.ExecuteAsync(sql, security);
+            
+            var parameters = new
+            {
+                UserId = security.UserId,
+                IsEmailVerified = security.IsEmailVerified,
+                VerificationToken = security.VerificationToken,
+                PasswordHash = security.PasswordHash,
+                PasswordResetToken = security.PasswordResetToken,
+                ResetTokenExpiry = security.ResetTokenExpiry,
+                FailedLoginAttempts = security.FailedLoginAttempts,
+                LockoutEnd = security.LockoutEnd,
+                IsLocked = security.IsLocked
+            };
+
+            await connection.ExecuteAsync(
+                "sp_UpdateSecurityStatus",
+                parameters,
+                commandType: CommandType.StoredProcedure
+            );
         }
 
         public async Task UpdateUserAsync(User user)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"UPDATE Users 
-                SET FullName = @FullName, 
-                    GoogleId = @GoogleId
-                WHERE Id = @Id";
-            await connection.ExecuteAsync(sql, user);
+            
+            var parameters = new 
+            {
+                Id = user.Id,
+                FullName = user.FullName,
+                GoogleId = user.GoogleId
+            };
+
+            await connection.ExecuteAsync(
+                "sp_UpdateUser",
+                parameters,
+                commandType: CommandType.StoredProcedure
+            );
         }
 
-        //List lawyers needing verification
         public async Task<IEnumerable<dynamic>> GetUnverifiedLawyersAsync()
         {
             using var connection = _context.CreateConnection();
-            var sql = @"SELECT u.Id, u.FullName, u.Email, p.EnrollmentNumber 
-                FROM Users u
-                JOIN LawyerProfiles p ON u.Id = p.UserId
-                WHERE p.IsVerified = 0"; // Assuming you added IsVerified column
-
-            return await connection.QueryAsync(sql);
+            return await connection.QueryAsync(
+                "sp_GetUnverifiedLawyers",
+                commandType: CommandType.StoredProcedure
+            );
         }
 
         public async Task<bool> UpdateLawyerVerificationAsync(int userId, bool status)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"UPDATE LawyerProfiles SET IsVerified = @Status WHERE UserId = @UserId";
-            var rows = await connection.ExecuteAsync(sql, new { UserId = userId, Status = status });
+            var rows = await connection.ExecuteAsync(
+                "sp_UpdateLawyerVerification",
+                new { UserId = userId, Status = status },
+                commandType: CommandType.StoredProcedure
+            );
             return rows > 0;
         }
 
-
-        // --- SENIOR FIRM MANAGEMENT METHODS ---
-
-        // Fetch all juniors linked to a specific Senior ID
         public async Task<IEnumerable<dynamic>> GetFirmAssociatesAsync(int seniorId)
         {
             using var connection = _context.CreateConnection();
-
-            // We join Users and Profiles to get a clean summary of the Junior
-            var sql = @"SELECT 
-                            u.Id, 
-                            u.Email, 
-                            u.FullName, 
-                            p.EnrollmentNumber, 
-                            p.Specialization 
-                        FROM Users u 
-                        JOIN LawyerProfiles p ON u.Id = p.UserId 
-                        WHERE p.SeniorLawyerId = @SeniorId";
-
-            return await connection.QueryAsync(sql, new { SeniorId = seniorId });
+            return await connection.QueryAsync(
+                "sp_GetFirmAssociates",
+                new { SeniorId = seniorId },
+                commandType: CommandType.StoredProcedure
+            );
         }
 
-        // Update the Firm's Bio
         public async Task UpdateFirmBioAsync(int userId, string firmBio)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"UPDATE LawyerProfiles 
-                        SET FirmBio = @FirmBio 
-                        WHERE UserId = @UserId";
-
-            await connection.ExecuteAsync(sql, new { UserId = userId, FirmBio = firmBio });
+            await connection.ExecuteAsync(
+                "sp_UpdateFirmBio",
+                new { UserId = userId, FirmBio = firmBio },
+                commandType: CommandType.StoredProcedure
+            );
         }
-
-
-
-        // --- Junior FIRM MANAGEMENT METHODS ---
 
         public async Task<dynamic?> GetSeniorForJuniorAsync(int juniorId)
         {
             using var connection = _context.CreateConnection();
-            var sql = @"SELECT senior.Id, senior.FullName, senior.Email, p_senior.Specialization, p_senior.FirmBio
-                FROM Users junior
-                JOIN LawyerProfiles p_junior ON junior.Id = p_junior.UserId
-                JOIN Users senior ON p_junior.SeniorLawyerId = senior.Id
-                JOIN LawyerProfiles p_senior ON senior.Id = p_senior.UserId
-                WHERE junior.Id = @JuniorId";
-
-            return await connection.QueryFirstOrDefaultAsync(sql, new { JuniorId = juniorId });
+            return await connection.QueryFirstOrDefaultAsync(
+                "sp_GetSeniorForJunior",
+                new { JuniorId = juniorId },
+                commandType: CommandType.StoredProcedure
+            );
         }
+
         public async Task<bool> RemoveJuniorAssociateAsync(int seniorId, int juniorId)
         {
-            var query = @"
-                UPDATE LawyerProfiles 
-                SET SeniorLawyerId = NULL 
-                WHERE UserId = @JuniorId AND SeniorLawyerId = @SeniorId;
-            ";
-
             using var connection = _context.CreateConnection();
-            
-            // ExecuteAsync returns the number of rows affected.
-            var rowsAffected = await connection.ExecuteAsync(query, new { SeniorId = seniorId, JuniorId = juniorId });
+            var rowsAffected = await connection.ExecuteAsync(
+                "sp_RemoveJuniorAssociate",
+                new { SeniorId = seniorId, JuniorId = juniorId },
+                commandType: CommandType.StoredProcedure
+            );
 
-            // If rowsAffected > 0, it means it successfully found and removed the junior
             return rowsAffected > 0;
         }
     }
