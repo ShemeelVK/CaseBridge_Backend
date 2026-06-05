@@ -24,33 +24,11 @@ namespace CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCases
         public async Task<IEnumerable<CaseDTO>> Handle(GetFirmCasesQuery request, CancellationToken cancellation)
         {
             using var connection = _dapper.GetConnection();
-
-            var sql = @"
-                SELECT 
-                    Id, 
-                    ClientId, 
-                    ClientName,
-                    Title, 
-                    Description, 
-                    Category, 
-                    Status,
-                    Budget,
-                    AssignedFirmId, 
-                    AcceptedByUserId, 
-                    LawyerName,
-                    CreatedAt, 
-                    LastModifiedByUserId 
-                FROM Cases 
-                WHERE AssignedFirmId = @FirmId";
-
-            if (!request.IsSenior)
-            {
-                sql += " AND AcceptedByUserId = @UserId";
-            }
-
-            sql += " ORDER BY CreatedAt DESC";
-
-            return await connection.QueryAsync<CaseDTO>(sql, new { FirmId = request.FirmId, UserId = request.UserId });
+            return await connection.QueryAsync<CaseDTO>(
+                "sp_GetFirmCases", 
+                new { FirmId = request.FirmId, UserId = request.UserId, IsSenior = request.IsSenior }, 
+                commandType: System.Data.CommandType.StoredProcedure
+            );
         }
     }
 }

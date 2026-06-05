@@ -22,26 +22,11 @@ namespace CaseBridge_Cases.Features.Marketplace.Queries.GetCaseById
         public async Task<Case?> Handle(GetCaseByIdQuery request, CancellationToken cancellationToken)
         {
             using var connection = _dapperContext.GetConnection();
-            var sql = @"
-                SELECT 
-                    Id, 
-                    ClientId, 
-                    ClientName,
-                    Title, 
-                    Description, 
-                    Category, 
-                    Status,
-                    Budget,
-                    AssignedFirmId, 
-                    AcceptedByUserId, 
-                    LawyerName,
-                    AiSummary,
-                    CreatedAt, 
-                    LastModifiedByUserId 
-                FROM Cases 
-                WHERE Id = @Id";
-
-            return await connection.QueryFirstOrDefaultAsync<Case>(sql, new {request.Id});
+            return await connection.QueryFirstOrDefaultAsync<Case>(
+                "sp_GetCaseById", 
+                new { Id = request.Id }, 
+                commandType: System.Data.CommandType.StoredProcedure
+            );
         }
     }
 }

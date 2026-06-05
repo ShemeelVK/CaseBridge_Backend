@@ -1,11 +1,14 @@
 using CaseBridge_Cases.Data;
 using CaseBridge_Cases.Features.Chat.Hubs;
 using CaseBridge_Cases.Middleware;
+using CaseBridge_Cases.Models;
 using MassTransit;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.OData;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.SqlServer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OData.ModelBuilder;
 using Microsoft.OpenApi.Models;
 using Minio;
 using System.Text;
@@ -20,7 +23,31 @@ namespace CaseBridge.Cases
 
             // Add services to the container.
 
-            builder.Services.AddControllers();
+            //builder that tells OData about our database models
+            // IMPORTANT: You cannot register the same CLR type (Case) multiple times in ONE model.
+            // Solution: Give each entity set its OWN separate route component with its own EDM model.
+
+            // 1. General marketplace cases → /odata/Cases (CasesController if needed)
+            var casesModel = new ODataConventionModelBuilder();
+            casesModel.EntitySet<Case>("Cases");
+
+            // 2. Client dashboard → /odata/ClientCases → ClientCasesController
+            var clientCasesModel = new ODataConventionModelBuilder();
+            clientCasesModel.EntitySet<Case>("ClientCases");
+
+            // 3. Firm/Lawyer dashboard → /odata/FirmCases → FirmCasesController
+            var firmCasesModel = new ODataConventionModelBuilder();
+            firmCasesModel.EntitySet<Case>("FirmCases");
+
+            //Register controllers AND enable OData super-powers
+            builder.Services.AddControllers().AddOData(options =>
+            {
+                options.Select().Filter().OrderBy().Count().SetMaxTop(100);
+                options.AddRouteComponents("odata", casesModel.GetEdmModel());
+                options.AddRouteComponents("odata/client", clientCasesModel.GetEdmModel());
+                options.AddRouteComponents("odata/firm", firmCasesModel.GetEdmModel());
+            });
+
             // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
             builder.Services.AddEndpointsApiExplorer();
             builder.Services.AddSwaggerGen();

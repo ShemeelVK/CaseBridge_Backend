@@ -26,46 +26,19 @@ namespace CaseBridge_Cases.Features.Chat.Queries
         public async Task<bool> Handle(ValidateChatAccessQuery request, CancellationToken cancellationToken)
         {
             using var connection = _dapperContext.GetConnection();
-
-            var sql = @"
-                SELECT ClientId, AssignedFirmId 
-                FROM Cases 
-                WHERE Id = @CaseId";
-
-            //use dynamic typing here since I only need two properties and dont need a full DTO
-            var caseOwnership = await connection.QueryFirstOrDefaultAsync(sql, new { request.CaseId });
-
-            if (caseOwnership == null) return false;
-
-            if(request.Role=="Client")
-            {
-                return caseOwnership.ClientId == request.UserId
-                       && request.RoomType.Equals("external", StringComparison.OrdinalIgnoreCase);
-            }
-
-            if (request.Role == "Lawyer" || request.Role == "Junior")
-            {
-                // Is the case currently assigned to this firm?
-                bool isCurrentlyAssigned = caseOwnership.AssignedFirmId != null && caseOwnership.AssignedFirmId == request.FirmId;
-
-                if (isCurrentlyAssigned)
-                {
-                    return true; // Allowed in both External and Internal rooms
-                }
-
-                // Historical Bypass: If they dropped it, check if they have past messages
-                var pastMessagesSql = @"
-                    SELECT COUNT(1) 
-                    FROM ChatMessages 
-                    WHERE CaseId = @CaseId 
-                    AND (FirmId = @FirmId OR SenderId = @UserId OR ReceiverId = @UserId)";
-                    
-                var pastMessagesCount = await connection.ExecuteScalarAsync<int>(pastMessagesSql, new { request.CaseId, request.FirmId, request.UserId });
-                
-                return pastMessagesCount > 0;
-            }
-
-            return false;
+            
+            return await connection.ExecuteScalarAsync<bool>(
+                "sp_ValidateChatAccess",
+                new 
+                { 
+                    CaseId = request.CaseId, 
+                    UserId = request.UserId, 
+                    FirmId = request.FirmId, 
+                    Role = request.Role, 
+                    RoomType = request.RoomType 
+                },
+                commandType: System.Data.CommandType.StoredProcedure
+            );
 
         }
     }

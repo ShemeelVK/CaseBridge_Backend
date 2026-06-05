@@ -22,33 +22,11 @@ namespace CaseBridge_Cases.Features.Lawyer.Queries.GetFirmCasesById
         public async Task<CaseDetailDTO?> Handle(GetFirmCaseByIdQuery request, CancellationToken ct)
         {
             using var connection = _dapper.GetConnection();
-
-            var caseSql = @"
-                        SELECT 
-                            Id, ClientId, ClientName, Title, Description, 
-                            Status, AssignedFirmId, AcceptedByUserId, CreatedAt, 
-                            Category, LastModifiedByUserId, Budget, LawyerName, AiSummary
-                        FROM Cases 
-                        WHERE Id = @CaseId AND AssignedFirmId = @FirmId";
-
-            if (!request.IsSenior)
-            {
-                caseSql += " AND AcceptedByUserId = @UserId";
-            }
-
-            // Filtered to exclude chat attachments
-            var sql = $@"{caseSql}; 
-                SELECT 
-                    Id, CaseId, UploaderId, FileName, FileUrl, UploadedAt
-                FROM CaseDocuments 
-                WHERE CaseId = @CaseId AND ChatMessageId IS NULL;";
-
-            using var multi = await connection.QueryMultipleAsync(sql, new
-            {
-                request.CaseId,
-                request.FirmId,
-                request.UserId
-            });
+            using var multi = await connection.QueryMultipleAsync(
+                "sp_GetFirmCaseById", 
+                new { request.CaseId, request.FirmId, request.UserId, request.IsSenior },
+                commandType: System.Data.CommandType.StoredProcedure
+            );
 
             var caseDto = await multi.ReadFirstOrDefaultAsync<CaseDetailDTO>();
 

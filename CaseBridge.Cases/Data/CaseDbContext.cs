@@ -5,7 +5,7 @@ namespace CaseBridge_Cases.Data
 {
     public class CaseDbContext : DbContext
     {
-        public CaseDbContext(DbContextOptions options) : base(options)
+        public CaseDbContext(DbContextOptions <CaseDbContext> options) : base(options)
         {
         }
 

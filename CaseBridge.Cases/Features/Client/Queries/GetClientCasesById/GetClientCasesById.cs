@@ -20,20 +20,11 @@ namespace CaseBridge_Cases.Features.Client.Queries.GetClientCasesById
         public async Task<CaseDetailDTO?> Handle(GetClientCasesById request, CancellationToken ct)
         {
             using var connection = _dapper.GetConnection();
-                    var sql = @"
-                SELECT 
-                    Id, ClientId, ClientName, Title, Description, 
-                    Status, AssignedFirmId, AcceptedByUserId, CreatedAt, 
-                    Category, LastModifiedByUserId, Budget, LawyerName, AiSummary
-                FROM Cases 
-                WHERE Id = @CaseId AND ClientId = @ClientId;
-
-                SELECT 
-                    Id, CaseId, UploaderId, FileName, FileUrl, UploadedAt
-                FROM CaseDocuments 
-                WHERE CaseId = @CaseId AND ChatMessageId IS NULL;";
-
-            using var multi = await connection.QueryMultipleAsync(sql, new { request.CaseId, request.ClientId });
+            using var multi = await connection.QueryMultipleAsync(
+                "sp_GetClientCaseById", 
+                new { request.CaseId, request.ClientId },
+                commandType: System.Data.CommandType.StoredProcedure
+            );
             var caseDto = await multi.ReadFirstOrDefaultAsync<CaseDetailDTO>();
 
             if (caseDto != null)

@@ -27,45 +27,18 @@ namespace CaseBridge_Cases.Features.Chat.Queries
         {
             using var connection = _context.GetConnection();
 
-            string sql;
-            object parameters;
-
-            if (request.CaseId == 0 && request.TargetUserId.HasValue && request.CurrentUserId.HasValue)
-            {
-                // 1-on-1 DM
-                sql = @"
-                    SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId
-                    FROM ChatMessages
-                    WHERE CaseId = 0 AND RoomType = @RoomType AND (
-                        (SenderId = @UserId AND ReceiverId = @TargetId) OR
-                        (SenderId = @TargetId AND ReceiverId = @UserId)
-                    )
-                    ORDER BY SendAt ASC";
-                parameters = new { RoomType = request.RoomType, UserId = request.CurrentUserId, TargetId = request.TargetUserId };
-            }
-            else if (!request.TargetUserId.HasValue && request.RoomType.Equals("internal", StringComparison.OrdinalIgnoreCase) && request.FirmId.HasValue)
-            {
-                // Firm group chat
-                sql = @"
-                    SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId
-                    FROM ChatMessages
-                    WHERE CaseId = @CaseId AND RoomType = @RoomType AND FirmId = @FirmId
-                    ORDER BY SendAt ASC";
-                parameters = new { CaseId = request.CaseId, RoomType = request.RoomType, FirmId = request.FirmId.Value };
-            }
-            else
-            {
-                // Universal external chat
-                sql = @"
-                    SELECT Id, SenderId, SenderName, MessageText, SendAt, ParentMessageId
-                    FROM ChatMessages
-                    WHERE CaseId = @CaseId AND RoomType = @RoomType
-                    AND (SenderId = @CurrentUserId OR ReceiverId = @CurrentUserId)
-                    ORDER BY SendAt ASC";
-                parameters = new { CaseId = request.CaseId, RoomType = request.RoomType, CurrentUserId = request.CurrentUserId!.Value };
-            }
-
-            var messages = (await connection.QueryAsync<ChatMessageDTO>(sql, parameters)).ToList();
+            var messages = (await connection.QueryAsync<ChatMessageDTO>(
+                "sp_GetChatHistory",
+                new 
+                { 
+                    CaseId = request.CaseId, 
+                    RoomType = request.RoomType, 
+                    TargetUserId = request.TargetUserId, 
+                    CurrentUserId = request.CurrentUserId, 
+                    FirmId = request.FirmId 
+                },
+                commandType: System.Data.CommandType.StoredProcedure
+            )).ToList();
 
             // Second pass: fetch all attachments for these messages in one query
             if (messages.Count > 0)

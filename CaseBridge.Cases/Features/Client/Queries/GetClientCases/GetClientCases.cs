@@ -23,14 +23,11 @@ namespace CaseBridge_Cases.Features.Client.Queries.GetClientCases
         public async Task<IEnumerable<CaseDTO>> Handle(GetClientCases request,CancellationToken cancellationToken)
         {
             using var connection = _dapperContext.GetConnection();
-
-            var sql = @"
-                SELECT Id, Title, Description, Status, Budget, ClientId, ClientName, LawyerName, CreatedAt, AssignedFirmId 
-                FROM Cases 
-                WHERE ClientId = @ClientId 
-                ORDER BY CreatedAt DESC";
-
-            return await connection.QueryAsync<CaseDTO>(sql, new { ClientId = request.ClientId });
+            return await connection.QueryAsync<CaseDTO>(
+                "sp_GetClientCases", 
+                new { ClientId = request.ClientId }, 
+                commandType: System.Data.CommandType.StoredProcedure
+            );
         }
     }
 }

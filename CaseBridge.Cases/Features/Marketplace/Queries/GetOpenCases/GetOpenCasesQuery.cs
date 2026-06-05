@@ -23,27 +23,10 @@ namespace CaseBridge_Cases.Features.Marketplace.Queries.GetOpenCases
         public async Task<IEnumerable<CaseDTO>> Handle(GetOpenCasesQuery request, CancellationToken cancellationToken)
         {
             using var connection = _dapperContext.GetConnection();
-            var sql = @"
-                SELECT 
-                    Id, 
-                    ClientId, 
-                    ClientName,
-                    Title, 
-                    Description, 
-                    Category, 
-                    Status,
-                    Budget,
-                    AssignedFirmId, 
-                    AcceptedByUserId, 
-                    LawyerName,
-                    AiSummary,
-                    CreatedAt, 
-                    LastModifiedByUserId 
-                FROM Cases 
-                WHERE Status = 'Open' 
-                ORDER BY CreatedAt DESC";
-
-            return await connection.QueryAsync<CaseDTO>(sql);
+            return await connection.QueryAsync<CaseDTO>(
+                "sp_GetOpenCases", 
+                commandType: System.Data.CommandType.StoredProcedure
+            );
         }
     }
 }
